@@ -62,50 +62,54 @@ const ErrorMsg = styled.div`
 `;
 
 export const Login = () => {
-    const [username, setUsername] = useState('');
-    const [password, setPassword] = useState('');
-    const [error, setError] = useState('');
-    const [loading, setLoading] = useState(false);
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setLoading(true);
-        setError('');
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
 
-        try {
-            const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-            const res = await axios.post(`${apiUrl}/auth/login`, { username, password });
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      const res = await axios.post(`${apiUrl}/auth/login`, { username, password });
 
-            localStorage.setItem('token', res.data.access_token);
-            window.location.href = '/'; // Simple redirect to reload App
-        } catch (err: any) {
-            setError(err.response?.data?.message || 'Login failed');
-        } finally {
-            setLoading(false);
-        }
-    };
+      localStorage.setItem('token', res.data.access_token);
+      window.location.href = '/'; // Simple redirect to reload App
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Login failed');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    return (
-        <Container>
-            <Form onSubmit={handleSubmit}>
-                <h2 style={{ textAlign: 'center', marginBottom: '8px' }}>Login</h2>
-                {error && <ErrorMsg>{error}</ErrorMsg>}
-                <Input
-                    type="text"
-                    placeholder="Username"
-                    value={username}
-                    onChange={e => setUsername(e.target.value)}
-                />
-                <Input
-                    type="password"
-                    placeholder="Password"
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                />
-                <Button type="submit" disabled={loading}>
-                    {loading ? 'Logging in...' : 'Login'}
-                </Button>
-            </Form>
-        </Container>
-    );
+  return (
+    <Container>
+      <Form onSubmit={handleSubmit}>
+        <h2 style={{ textAlign: 'center', marginBottom: '8px' }}>Login</h2>
+        {error && <ErrorMsg>{error}</ErrorMsg>}
+        <Input
+          id="sf-userid"
+          name="sf-userid"
+          type="text"
+          placeholder="Username"
+          value={username}
+          onChange={e => setUsername(e.target.value)}
+        />
+        <Input
+          id="sf-password"
+          name="sf-password"
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={e => setPassword(e.target.value)}
+        />
+        <Button type="submit" disabled={loading}>
+          {loading ? 'Logging in...' : 'Login'}
+        </Button>
+      </Form>
+    </Container>
+  );
 };
