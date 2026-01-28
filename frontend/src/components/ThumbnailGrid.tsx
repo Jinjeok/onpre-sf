@@ -5,86 +5,66 @@ import api from '../api';
 import axios from 'axios';
 
 const PageContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  /* Use dynamic viewport height for mobile browsers if supported */
-  height: 100dvh;
-  overflow: hidden;
+  min-height: 100vh;
   background-color: #0d1117;
 `;
 
 const GridContainer = styled.div`
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-  gap: 16px;
-  padding: 16px;
-  flex: 1;
-  overflow-y: auto;
-  min-height: 0;
-  align-items: start;
+  gap: 12px;
+  padding: 12px;
 
   @media (min-width: 768px) {
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 32px;
-    padding: 32px;
+    gap: 24px;
+    padding: 24px;
   }
 `;
 
 const FeedContainer = styled.div`
-  width: 100%;
-  flex: 1;
-  overflow-y: scroll;
-  scroll-snap-type: y mandatory;
-  background: #000;
-  position: relative;
-  min-height: 0;
-
-  /* Hide scrollbar */
-  &::-webkit-scrollbar { display: none; }
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 20px;
+  max-width: 800px;
+  margin: 0 auto;
 `;
 
-const FeedItem = styled.div`
-  width: 100%;
-  height: 100%;
-  scroll-snap-align: start;
+const FeedCardItem = styled.div`
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  overflow: hidden;
+`;
+
+const FeedMediaArea = styled.div`
   position: relative;
+  width: 100%;
+  background: #000;
   display: flex;
   justify-content: center;
   align-items: center;
-  background: #000;
-`;
 
-const FeedContent = styled.div`
-    width: 100%;
-    height: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    position: relative;
-    padding: 15px; /* Add some breathing room */
-    box-sizing: border-box;
-
-    img, video {
-        max-width: 100%;
-        max-height: 100%;
-        width: auto;
-        height: auto;
-        object-fit: contain;
-    }
+  img, video {
+    max-width: 100%;
+    max-height: 80vh; 
+    width: auto;
+    height: auto;
+    display: block;
+  }
 `;
 
 const Header = styled.header`
-  padding: 12px 16px;
+  padding: 16px;
   background: #161b22;
   border-bottom: 1px solid #30363d;
   display: flex;
   flex-direction: column;
   gap: 12px;
+  position: sticky;
+  top: 0;
   z-index: 100;
-  flex-shrink: 0;
 
   @media (min-width: 768px) {
     flex-direction: row;
@@ -94,41 +74,33 @@ const Header = styled.header`
 `;
 
 const Thumbnail = styled.div`
+  aspect-ratio: 1;
   position: relative;
-  width: 100%;
-  aspect-ratio: 1 / 1;
-  border-radius: 12px;
+  border-radius: 8px;
   overflow: hidden;
-  background-color: #1a1a1a;
+  background-color: #222;
   cursor: pointer;
-  border: 2px solid #30363d;
-  transition: transform 0.2s cubic-bezier(0.2, 0, 0.4, 1), box-shadow 0.2s;
-  box-sizing: border-box;
+  border: 1px solid #30363d;
 
-  &:hover {
-    transform: translateY(-8px);
-    box-shadow: 0 16px 32px rgba(0,0,0,0.7);
-    z-index: 10;
-    border-color: #58a6ff;
-  }
-`;
-
-const ThumbnailInner = styled.div`
-  width: 100%;
-  height: 100%;
+  /* Collage Support - Grid applied directly to Thumbnail */
   display: grid;
   gap: 2px;
-  box-sizing: border-box;
-
+  
   &.collage-1 { grid-template-columns: 1fr; gap: 0; }
   &.collage-2 { grid-template-columns: 1fr 1fr; }
   &.collage-3 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; } 
   &.collage-3 > :first-child { grid-row: 1 / -1; }
   &.collage-4 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
-
   &.collage-multi { 
       grid-template-columns: repeat(3, 1fr); 
       grid-template-rows: repeat(3, 1fr); 
+  }
+  
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    z-index: 10;
+    border-color: #58a6ff;
   }
 `;
 
@@ -903,42 +875,42 @@ export const ThumbnailGrid = () => {
                         const remainder = count - 9;
 
                         return (
-                            <Thumbnail key={group.discordMessageId} onClick={() => handleGroupClick(group)}>
-                                <ThumbnailInner className={collageClass}>
-                                    {displayItems.map((item, idx) => {
-                                        const isVideo = item.type === 'video';
-                                        const showOverlay = idx === 8 && remainder > 0;
+                            <Thumbnail
+                                key={group.discordMessageId}
+                                onClick={() => handleGroupClick(group)}
+                                className={collageClass}
+                            >
+                                {displayItems.map((item, idx) => {
+                                    const isVideo = item.type === 'video';
+                                    const showOverlay = idx === 8 && remainder > 0;
 
-                                        return (
-                                            <div key={item.id} style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }}>
-                                                {item.thumbnailUrl ? (
-                                                    <CollageImage src={getFullUrl(item.thumbnailUrl)} alt="thumb" loading="lazy" />
-                                                ) : isVideo ? (
-                                                    <CollageVideo src={getFullUrl(item.minioUrl)} muted loop />
-                                                ) : (
-                                                    <CollageImage src={getFullUrl(item.minioUrl)} alt="thumb" loading="lazy" />
-                                                )}
+                                    return (
+                                        <div key={item.id} style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }}>
+                                            {item.thumbnailUrl ? (
+                                                <CollageImage src={getFullUrl(item.thumbnailUrl)} alt="thumb" loading="lazy" />
+                                            ) : isVideo ? (
+                                                <CollageVideo src={getFullUrl(item.minioUrl)} muted loop />
+                                            ) : (
+                                                <CollageImage src={getFullUrl(item.minioUrl)} alt="thumb" loading="lazy" />
+                                            )}
 
-                                                {count === 1 && isVideo && item.duration && (
-                                                    <DurationBadge>{formatDuration(item.duration)}</DurationBadge>
-                                                )}
+                                            {count === 1 && isVideo && item.duration && (
+                                                <DurationBadge>{formatDuration(item.duration)}</DurationBadge>
+                                            )}
 
-                                                {showOverlay && (
-                                                    <div style={{
-                                                        position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)',
-                                                        color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                        fontSize: '18px', fontWeight: 'bold'
-                                                    }}>
-                                                        +{remainder}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
-                                </ThumbnailInner>
+                                            {showOverlay && (
+                                                <div style={{
+                                                    position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)',
+                                                    color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                    fontSize: '18px', fontWeight: 'bold'
+                                                }}>
+                                                    +{remainder}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
 
-                                {count === 1 && <TypeBadge>{group.media[0].type}</TypeBadge>}
-                                {count > 1 && <TypeBadge style={{ background: '#444' }}>x{count}</TypeBadge>}
                             </Thumbnail>
                         );
                     })}
