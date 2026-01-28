@@ -60,7 +60,7 @@ export class MediaService {
       .addSelect('MAX(media.content)', 'content')
       .addSelect('MAX(media.createdAt)', 'latest_fetch')
       .addSelect('MAX(media.discordCreatedAt)', 'latest_discord')
-      .where('media.isDeleted = false')
+      .where('media.isAvailable = :isAvailable', { isAvailable: true })
       .groupBy('media.discordMessageId')
       .limit(limit)
       .offset(offset);
