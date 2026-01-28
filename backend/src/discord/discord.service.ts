@@ -244,6 +244,20 @@ export class DiscordService implements OnModuleInit {
 
             // Video Trimming Logic - REMOVED (User requested full video)
             // if (type === 'video') { ... }
+            let duration: number | undefined;
+            if (type === 'video') {
+                try {
+                    const metadata: any = await new Promise((resolve, reject) => {
+                        ffmpeg(tempInput).ffprobe((err, data) => {
+                            if (err) reject(err);
+                            else resolve(data);
+                        });
+                    });
+                    duration = metadata.format.duration;
+                } catch (err) {
+                    this.logger.warn(`Failed to get duration for ${cleanName}: ${err.message}`);
+                }
+            }
 
             await this.minioService.uploadFile(objectName, uploadBuffer, streamSize, {
                 'Content-Type': contentType || (type === 'video' ? 'video/mp4' : 'image/jpeg'),
@@ -307,6 +321,7 @@ export class DiscordService implements OnModuleInit {
                 type,
                 minioUrl: minioUrl,
                 thumbnailUrl: thumbnailMinioUrl, // Store thumbnail URL
+                duration: duration, // Store video duration
                 discordMessageId: message.id,
                 originalChannel: message.channelId,
                 content: contentOverride ?? message.content,

@@ -72,6 +72,34 @@ const CountBadge = styled.div`
   z-index: 2;
 `;
 
+const DurationBadge = styled.div`
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  background: rgba(0, 0, 0, 0.85);
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  z-index: 2;
+  font-family: monospace;
+`;
+
+const formatDuration = (seconds?: number) => {
+    if (!seconds) return '';
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = Math.floor(seconds % 60);
+
+    const parts = [];
+    if (h > 0) parts.push(h);
+    parts.push(h > 0 ? String(m).padStart(2, '0') : m);
+    parts.push(String(s).padStart(2, '0'));
+
+    return parts.join(':');
+};
+
 const Loading = styled.div`
   grid-column: 1 / -1;
   text-align: center;
@@ -347,6 +375,12 @@ const FeedCard = ({ group, getFullUrl, onReportError }: { group: GroupedMedia, g
                     />
                 )}
 
+                {currentItem.type === 'video' && currentItem.duration && (
+                    <DurationBadge style={{ bottom: '20px', right: '20px', fontSize: '13px', padding: '4px 8px' }}>
+                        {formatDuration(currentItem.duration)}
+                    </DurationBadge>
+                )}
+
                 {group.media.length > 1 && (
                     <NavButton className="next" onClick={handleNext}>›</NavButton>
                 )}
@@ -425,6 +459,7 @@ interface MediaItem {
     type: string;
     minioUrl: string;
     thumbnailUrl?: string;
+    duration?: number;
     originalChannel: string;
     discordMessageId: string;
     content?: string;
@@ -824,6 +859,9 @@ export const ThumbnailGrid = () => {
                                 <TypeBadge>{cover.type}</TypeBadge>
                                 {group.media.length > 1 && (
                                     <CountBadge>1/{group.media.length}</CountBadge>
+                                )}
+                                {cover.type === 'video' && cover.duration && (
+                                    <DurationBadge>{formatDuration(cover.duration)}</DurationBadge>
                                 )}
                                 {cover.thumbnailUrl ? (
                                     <img src={getFullUrl(cover.thumbnailUrl)} alt="cover" loading="lazy" />

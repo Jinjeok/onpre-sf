@@ -32,6 +32,9 @@ export class Media {
     @Column({ nullable: true })
     thumbnailUrl: string;
 
+    @Column({ nullable: true, type: 'float' })
+    duration: number;
+
     @CreateDateColumn()
     createdAt: Date;
 }
