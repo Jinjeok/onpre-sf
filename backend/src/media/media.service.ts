@@ -72,7 +72,7 @@ export class MediaService {
     }
 
     const messageIdsResult = await query.getRawMany();
-    const messageIds = messageIdsResult.map(r => r.media_discordMessageId);
+    const messageIds = messageIdsResult.map(r => r.discord_message_id);
 
     if (messageIds.length === 0) return [];
 
