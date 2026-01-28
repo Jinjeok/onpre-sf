@@ -22,8 +22,8 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "${PORT_MINIO:-9000}:9000"
+      - "${PORT_MINIO_CONSOLE:-9001}:9001"
     volumes:
       - ./data/minio:/data
     networks:
@@ -36,7 +36,7 @@ services:
       dockerfile: Dockerfile
     container_name: onpre-sf-backend
     ports:
-      - "3000:3000"
+      - "${PORT_BACKEND:-3000}:3000"
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
@@ -69,7 +69,7 @@ services:
       dockerfile: Dockerfile
     container_name: onpre-sf-frontend
     ports:
-      - "5173:5173"
+      - "${PORT_FRONTEND:-5173}:5173"
     environment:
       - VITE_API_URL=${VITE_API_URL}
     depends_on:
