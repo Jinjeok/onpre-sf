@@ -23,6 +23,9 @@ export class Media {
     @Column({ nullable: true, type: 'timestamp' })
     discordCreatedAt: Date;
 
+    @Column({ unique: true, nullable: true })
+    hash: string;
+
     @Column({ default: true })
     isAvailable: boolean;
 

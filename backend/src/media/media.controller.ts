@@ -54,6 +54,7 @@ export class MediaController {
   }
 
   @Get('media')
+  @UseGuards(JwtAuthGuard)
   async getMedia(@Query('key') key: string, @Req() req: Request, @Res() res: Response) {
     if (!key) {
       return res.status(400).send('Missing key');

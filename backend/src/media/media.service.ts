@@ -23,6 +23,13 @@ export class MediaService {
     return count > 0;
   }
 
+  async existsByHash(hash: string): Promise<boolean> {
+    const count = await this.mediaRepository.count({
+      where: { hash },
+    });
+    return count > 0;
+  }
+
   async findRandom(type?: string, limit: number = 50) {
     const query = this.mediaRepository.createQueryBuilder('media');
     if (type) {

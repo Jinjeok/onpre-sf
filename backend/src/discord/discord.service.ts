@@ -205,47 +205,45 @@ export class DiscordService implements OnModuleInit {
             return false;
         }
 
+        const uniqueId = crypto.createHash('md5').update(url).digest('hex').substring(0, 8);
+        const tempInput = path.join(os.tmpdir(), `${uniqueId}_input`);
+
         try {
-            // this.logger.log(`Processing media: ${url} (${type}) from message ${message.id}`);
             const response = await fetch(url);
             if (!response.ok) throw new Error(`Failed to fetch ${url}`);
 
+            // Download to calculate hash
+            const fileStream = fs.createWriteStream(tempInput);
+            if (!response.body) throw new Error('Response body is null');
+            const nodeStream = this.convertWebStreamToNodeStream(response.body as unknown as ReadableStream<any>);
+            await new Promise((resolve, reject) => {
+                nodeStream.pipe(fileStream);
+                nodeStream.on('end', resolve);
+                nodeStream.on('error', reject);
+            });
+
+            // Calculate Hash
+            const fileBuffer = fs.readFileSync(tempInput);
+            const contentHash = crypto.createHash('sha256').update(fileBuffer).digest('hex');
+
+            // Check if exists
+            if (await this.mediaService.existsByHash(contentHash)) {
+                // this.logger.debug(`Skipping duplicate content: ${contentHash}`);
+                await unlinkAsync(tempInput).catch(() => { });
+                return true;
+            }
+
             const channelId = message.channelId;
-            // Clean filename
             const cleanName = (filename || 'unknown_file').replace(/[^a-zA-Z0-9._-]/g, '_');
-
-            // Deterministic Unique ID based on URL
-            const uniqueId = crypto.createHash('md5').update(url).digest('hex').substring(0, 8);
-
             const objectName = `${channelId}/${message.id}_${uniqueId}_${cleanName}`;
 
-            let streamSize = size;
-            let uploadStream: Readable | Buffer;
+            let uploadBuffer = fileBuffer;
+            let streamSize = fileBuffer.length;
 
             // Video Trimming Logic
             if (type === 'video') {
-                const tempInput = path.join(os.tmpdir(), `${uniqueId}_input.mp4`);
                 const tempOutput = path.join(os.tmpdir(), `${uniqueId}_output.mp4`);
-
                 try {
-                    // Save stream to file
-                    const fileStream = fs.createWriteStream(tempInput);
-
-                    // Logic to get stream/buffer
-                    if (!size || size === 0) {
-                        const buffer = await response.arrayBuffer();
-                        fs.writeFileSync(tempInput, Buffer.from(buffer));
-                    } else {
-                        if (!response.body) throw new Error('Response body is null');
-                        const nodeStream = this.convertWebStreamToNodeStream(response.body);
-                        await new Promise((resolve, reject) => {
-                            nodeStream.pipe(fileStream);
-                            nodeStream.on('end', resolve);
-                            nodeStream.on('error', reject);
-                        });
-                    }
-
-                    // Process with ffmpeg
                     await new Promise((resolve, reject) => {
                         ffmpeg(tempInput)
                             .ffprobe((err, metadata) => {
@@ -260,43 +258,25 @@ export class DiscordService implements OnModuleInit {
                                         .on('error', reject)
                                         .run();
                                 } else {
-                                    fs.copyFileSync(tempInput, tempOutput);
-                                    resolve(null);
+                                    resolve(false);
                                 }
                             });
                     });
 
-                    // Read back for upload
-                    const processedBuffer = fs.readFileSync(tempOutput);
-                    streamSize = processedBuffer.length;
-                    uploadStream = PassThrough.from(processedBuffer);
-
-                    // Cleanup
-                    await unlinkAsync(tempInput).catch(() => { });
-                    await unlinkAsync(tempOutput).catch(() => { });
-
+                    if (fs.existsSync(tempOutput)) {
+                        uploadBuffer = fs.readFileSync(tempOutput);
+                        streamSize = uploadBuffer.length;
+                        await unlinkAsync(tempOutput).catch(() => { });
+                    }
                 } catch (videoError) {
                     this.logger.error(`FFmpeg processing failed for ${url}: ${videoError.message}. Uploading original.`);
-                    if (fs.existsSync(tempInput)) await unlinkAsync(tempInput).catch(() => { });
-                    if (fs.existsSync(tempOutput)) await unlinkAsync(tempOutput).catch(() => { });
-                    return false;
-                }
-            } else {
-                // Image or other
-                if (!size || size === 0) {
-                    const buffer = await response.arrayBuffer();
-                    streamSize = buffer.byteLength;
-                    uploadStream = Buffer.from(buffer);
-                } else {
-                    if (!response.body) throw new Error('Response body is null');
-                    // Need to cast response.body to ReadableStream<any>
-                    uploadStream = this.convertWebStreamToNodeStream(response.body as unknown as ReadableStream<any>);
                 }
             }
 
-            await this.minioService.uploadFile(objectName, streamSize === 0 ? Buffer.alloc(0) : (uploadStream as any), streamSize, {
+            await this.minioService.uploadFile(objectName, uploadBuffer, streamSize, {
                 'Content-Type': contentType || (type === 'video' ? 'video/mp4' : 'image/jpeg'),
                 'x-discord-message-id': message.id,
+                'x-content-hash': contentHash
             });
 
             const minioUrl = this.minioService.getFileUrl(objectName);
@@ -307,14 +287,16 @@ export class DiscordService implements OnModuleInit {
                 discordMessageId: message.id,
                 originalChannel: message.channelId,
                 content: contentOverride ?? message.content,
-                discordCreatedAt: message.createdAt
+                discordCreatedAt: message.createdAt,
+                hash: contentHash
             });
 
-            this.logger.log(`Saved ${type}: ${cleanName}`);
+            this.logger.log(`Saved ${type}: ${cleanName} (Hash: ${contentHash.substring(0, 8)})`);
+            await unlinkAsync(tempInput).catch(() => { });
             return true;
         } catch (err) {
+            await unlinkAsync(tempInput).catch(() => { });
             if (err.code === '23505') { // Unique violation
-                // this.logger.debug(`Skipping duplicate: ${message.id}`);
                 return true;
             } else {
                 this.logger.error(`Error processing media ${url}: ${err.message}`, err.stack);

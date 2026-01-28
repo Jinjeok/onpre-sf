@@ -263,15 +263,6 @@ const FeedContent = styled.div`
     }
 `;
 
-const FeedOverlay = styled.div`
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    background: linear-gradient(transparent, rgba(0,0,0,0.9));
-    padding: 20px;
-    z-index: 10;
-`;
 
 // Helper component for individual feed card
 const FeedCard = ({ group, getFullUrl, onReportError }: { group: GroupedMedia, getFullUrl: (u: string) => string, onReportError: (id: string) => void }) => {
@@ -587,13 +578,22 @@ export const ThumbnailGrid = () => {
 
     const getFullUrl = (url: string) => {
         let finalUrl = url;
+        const token = localStorage.getItem('token');
+        const tokenSuffix = token ? `&token=${token}` : '';
+
         if (finalUrl.includes('/feed/media/') && !finalUrl.includes('?key=')) {
             const parts = finalUrl.split('/feed/media/');
             if (parts.length === 2) {
                 const key = parts[1];
-                finalUrl = `/feed/media?key=${encodeURIComponent(key)}`;
+                finalUrl = `/feed/media?key=${encodeURIComponent(key)}${tokenSuffix}`;
+            }
+        } else if (finalUrl.includes('/feed/media?key=')) {
+            // Already converted but might need token
+            if (!finalUrl.includes('&token=')) {
+                finalUrl += tokenSuffix;
             }
         }
+
         if (finalUrl.startsWith('http')) return finalUrl;
         const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
         return `${baseUrl}${finalUrl}`;
