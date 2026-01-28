@@ -52,24 +52,23 @@ export class MediaService {
     });
   }
 
-  async findAllGrouped(limit: number = 20, offset: number = 0, type?: string, sortBy: 'fetch' | 'discord' = 'fetch') {
+  async findAllGrouped(limit: number, offset: number, type?: string, sortBy: 'fetch' | 'discord' = 'fetch', order: 'ASC' | 'DESC' = 'DESC') {
     // 1. Get distinct message IDs with pagination
     const query = this.mediaRepository.createQueryBuilder('media')
-      .select('media.discordMessageId')
+      .select('media.discordMessageId', 'discord_message_id')
+      .addSelect('MAX(media.originalChannel)', 'original_channel')
+      .addSelect('MAX(media.content)', 'content')
       .addSelect('MAX(media.createdAt)', 'latest_fetch')
       .addSelect('MAX(media.discordCreatedAt)', 'latest_discord')
+      .where('media.isDeleted = false')
       .groupBy('media.discordMessageId')
       .limit(limit)
       .offset(offset);
 
     if (sortBy === 'discord') {
-      query.orderBy('latest_discord', 'DESC');
+      query.orderBy('latest_discord', order);
     } else {
-      query.orderBy('latest_fetch', 'DESC');
-    }
-
-    if (type) {
-      query.where('media.type = :type', { type });
+      query.orderBy('latest_fetch', order);
     }
 
     const messageIdsResult = await query.getRawMany();
@@ -80,7 +79,7 @@ export class MediaService {
     // 2. Fetch all media for these IDs
     const itemsQuery = this.mediaRepository.createQueryBuilder('media')
       .where('media.discordMessageId IN (:...ids)', { ids: messageIds })
-      .orderBy('media.createdAt', 'DESC');
+      .orderBy('media.createdAt', 'DESC'); // Order media within group (always DESC for consistency?)
 
     if (type) {
       itemsQuery.andWhere('media.type = :type', { type });
