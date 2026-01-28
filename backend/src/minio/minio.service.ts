@@ -74,4 +74,8 @@ export class MinioService implements OnModuleInit {
         // Points to backend proxy via Query Parameter to avoid slash routing issues
         return `/feed/media?key=${encodeURIComponent(objectName)}`;
     }
+
+    async deleteFile(objectName: string) {
+        return this.minioClient.removeObject(this.bucketName, objectName);
+    }
 }

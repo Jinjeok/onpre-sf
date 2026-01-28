@@ -158,4 +158,32 @@ export class MediaService {
   async getMediaStream(key: string) {
     return this.minioService.getFileStream(key);
   }
+
+  async deleteMedia(id: string) {
+    const media = await this.mediaRepository.findOneBy({ id });
+    if (!media) {
+      throw new Error('Media not found');
+    }
+
+    // Try to extract object key. The minioUrl is stored as `/feed/media?key=...`
+    // We need the raw object name.
+    let objectName = media.minioUrl;
+    if (objectName.includes('?key=')) {
+      objectName = decodeURIComponent(objectName.split('?key=')[1]);
+    } else if (objectName.startsWith('http')) {
+      // Fallback if it was a full URL (legacy)
+      const parts = objectName.split('/');
+      // Assuming structure channelId/filename
+      objectName = parts.slice(-2).join('/');
+    }
+
+    try {
+      await this.minioService.deleteFile(objectName);
+    } catch (e) {
+      console.warn(`Failed to delete MinIO object ${objectName}: ${e.message}`);
+      // Proceed to delete DB record anyway
+    }
+
+    return this.mediaRepository.delete(id);
+  }
 }

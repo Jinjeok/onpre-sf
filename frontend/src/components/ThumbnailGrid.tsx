@@ -642,6 +642,64 @@ export const ThumbnailGrid = () => {
         touchEndX.current = 0;
     };
 
+    // Keyboard Navigation for Feed
+    useEffect(() => {
+        if (viewMode !== 'feed') return;
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                // Scroll to next item logic simply relies on browser scroll behavior or custom logic?
+                // For simplified "feed" like shorts, usually snap scrolling is handled by CSS.
+                // We can manually scroll too using window.scrollBy or finding next element.
+                // Since we use scroll-snap, arrow keys often scroll the container if aimed right.
+                // But container is FeedContainer. Let's focus it or find next item.
+                const container = document.querySelector('.feed-container');
+                if (container) {
+                    container.scrollBy({ top: window.innerHeight, behavior: 'smooth' });
+                }
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                const container = document.querySelector('.feed-container');
+                if (container) {
+                    container.scrollBy({ top: -window.innerHeight, behavior: 'smooth' });
+                }
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [viewMode]);
+
+    const handleDelete = async (id: string, group: GroupedMedia) => {
+        if (!window.confirm('Are you sure you want to delete this media? This cannot be undone.')) return;
+
+        try {
+            await api.delete(`/feed/${id}`);
+
+            // Update State
+            const updatedMedia = group.media.filter(m => m.id !== id);
+
+            if (updatedMedia.length === 0) {
+                // Remove entire group if empty
+                setGroups(prev => prev.filter(g => g.discordMessageId !== group.discordMessageId));
+                setSelectedGroup(null);
+            } else {
+                // Update group
+                const newGroup = { ...group, media: updatedMedia };
+                setGroups(prev => prev.map(g => g.discordMessageId === group.discordMessageId ? newGroup : g));
+                setSelectedGroup(newGroup);
+                // Adjust index if needed
+                if (selectedIndex >= updatedMedia.length) {
+                    setSelectedIndex(Math.max(0, updatedMedia.length - 1));
+                }
+            }
+        } catch (err) {
+            console.error('Failed to delete media:', err);
+            alert('Failed to delete media.');
+        }
+    };
+
     return (
         <>
             <Header>
@@ -724,7 +782,7 @@ export const ThumbnailGrid = () => {
                     )}
                 </GridContainer>
             ) : (
-                <FeedContainer>
+                <FeedContainer className="feed-container">
                     {feedItems.map((group, idx) => (
                         <FeedCard
                             key={`${group.discordMessageId}-${idx}`}
@@ -785,13 +843,30 @@ export const ThumbnailGrid = () => {
                                     </small>
                                     <MessageText>{selectedGroup.content || '(No Text Content)'}</MessageText>
                                 </div>
-                                <ButtonLink
-                                    href={`https://discord.com/channels/@me/${selectedGroup.originalChannel}/${selectedGroup.discordMessageId}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                >
-                                    Discord
-                                </ButtonLink>
+                                <div style={{ display: 'flex', gap: '8px', flexDirection: 'column' }}>
+                                    <ButtonLink
+                                        href={`https://discord.com/channels/@me/${selectedGroup.originalChannel}/${selectedGroup.discordMessageId}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                    >
+                                        Discord
+                                    </ButtonLink>
+                                    <button
+                                        style={{
+                                            background: '#da3633',
+                                            border: 'none',
+                                            color: 'white',
+                                            padding: '6px 12px',
+                                            borderRadius: '6px',
+                                            cursor: 'pointer',
+                                            fontSize: '12px',
+                                            fontWeight: 'bold'
+                                        }}
+                                        onClick={() => handleDelete(selectedGroup.media[selectedIndex].id, selectedGroup)}
+                                    >
+                                        Delete
+                                    </button>
+                                </div>
                             </div>
                         </InfoPanel>
                     </ModalContainer>

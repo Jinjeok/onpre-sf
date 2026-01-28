@@ -1,0 +1,48 @@
+# Apache2 Reverse Proxy Configuration Example (REVISED ORDER)
+# IMPORTANT: More specific paths MUST come BEFORE general paths (like /)
+# Enable modules: sudo a2enmod proxy proxy_http proxy_wstunnel ssl rewrite headers
+
+<VirtualHost *:80>
+    ServerName sf.mutsuki.kr
+    RewriteEngine On
+    RewriteCond %{SERVER_NAME} =sf.mutsuki.kr
+    RewriteRule ^ https://%{SERVER_NAME}%{REQUEST_URI} [END,NE,R=permanent]
+</VirtualHost>
+
+<VirtualHost *:443>
+    ServerName sf.mutsuki.kr
+
+    SSLEngine on
+    SSLCertificateFile /etc/letsencrypt/live/sf.mutsuki.kr/fullchain.pem
+    SSLCertificateKeyFile /etc/letsencrypt/live/sf.mutsuki.kr/privkey.pem
+
+    # Security Headers
+    Header always set Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set X-Content-Type-Options "nosniff"
+
+    # --- MUST BE FIRST: WebSocket (For Vite HMR) ---
+    RewriteEngine On
+    RewriteCond %{HTTP:Upgrade} =websocket [NC]
+    RewriteRule /(.*)           ws://localhost:9006/$1 [P,L]
+
+    # --- SECOND: Backend API (Specific Paths) ---
+    # Put these above the "/" root proxy
+    ProxyPass /feed http://localhost:9004/feed
+    ProxyPassReverse /feed http://localhost:9004/feed
+    
+    ProxyPass /auth http://localhost:9004/auth
+    ProxyPassReverse /auth http://localhost:9004/auth
+
+    # --- THIRD: Frontend (Catch-all) ---
+    ProxyPreserveHost On
+    ProxyPass / http://localhost:9006/
+    ProxyPassReverse / http://localhost:9006/
+
+    # Handle large file uploads
+    LimitRequestBody 0
+    ProxyTimeout 300
+
+    ErrorLog ${APACHE_LOG_DIR}/sf.mutsuki.kr-error.log
+    CustomLog ${APACHE_LOG_DIR}/sf.mutsuki.kr-access.log combined
+</VirtualHost>

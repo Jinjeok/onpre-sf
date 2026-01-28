@@ -1,4 +1,4 @@
-import { Controller, Get, Query, Param, Res, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Query, Param, Res, Req, UseGuards } from '@nestjs/common';
 import { MediaService } from './media.service';
 import type { Request, Response } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -95,5 +95,11 @@ export class MediaController {
       console.error(`[MediaController] Error serving media: ${key}`, error);
       if (!res.headersSent) res.status(404).send('Media not found');
     }
+  }
+
+  @Delete(':id')
+  @UseGuards(JwtAuthGuard)
+  async deleteMedia(@Param('id') id: string) {
+    return this.mediaService.deleteMedia(id);
   }
 }
