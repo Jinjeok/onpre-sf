@@ -852,6 +852,13 @@ export const ThumbnailGrid = () => {
                     >
                         Feed
                     </ToggleButton>
+                    <button style={{ marginLeft: '10px', padding: '5px 10px', background: '#444', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }} onClick={() => {
+                        if (confirm('Start global order repair? This may take a while.')) {
+                            api.post('/media/repair-indices').then(() => alert('Started!')).catch(e => alert('Failed: ' + e));
+                        }
+                    }}>
+                        Repair Order
+                    </button>
 
                     <Separator />
 

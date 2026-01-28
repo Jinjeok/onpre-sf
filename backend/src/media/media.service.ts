@@ -83,7 +83,8 @@ export class MediaService {
     // 2. Fetch all media for these IDs
     const itemsQuery = this.mediaRepository.createQueryBuilder('media')
       .where('media.discordMessageId IN (:...ids)', { ids: messageIds })
-      .orderBy('media.createdAt', 'DESC');
+      .orderBy('media.mediaIndex', 'ASC')
+      .addOrderBy('media.createdAt', 'ASC');
 
     if (type) {
       itemsQuery.andWhere('media.type = :type', { type });
@@ -139,7 +140,8 @@ export class MediaService {
   private async findAllGroupedByIds(messageIds: string[]) {
     const itemsQuery = this.mediaRepository.createQueryBuilder('media')
       .where('media.discordMessageId IN (:...ids)', { ids: messageIds })
-      .orderBy('media.createdAt', 'DESC'); // Order media within group
+      .orderBy('media.mediaIndex', 'ASC') // Primary sort: explicit index
+      .addOrderBy('media.createdAt', 'ASC'); // Secondary sort: creation time
 
     const mediaItems = await itemsQuery.getMany();
 

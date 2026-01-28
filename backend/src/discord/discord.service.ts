@@ -145,53 +145,56 @@ export class DiscordService implements OnModuleInit {
 
         // 1. Process Attachments
         if (message.attachments.size > 0) {
+            let attachIdx = 0;
             for (const [, attachment] of message.attachments) {
-                await this.processMediaUrl(message, attachment.url, attachment.contentType, attachment.name, attachment.size);
+                await this.processMediaUrl(message, attachment.url, attachment.contentType, attachment.name, attachment.size, attachIdx++);
             }
         }
 
         // 2. Process Embeds (External Links, etc.)
         if (message.embeds.length > 0) {
+            let embedIdx = 0;
             for (const embed of message.embeds) {
                 // this.logger.debug(`Inspecting Embed: ${JSON.stringify(embed)}`);
                 if (embed.video && embed.video.url) {
-                    await this.processMediaUrl(message, embed.video.url, 'video/embed', `embed_video_${message.id}`, 0);
+                    await this.processMediaUrl(message, embed.video.url, 'video/embed', `embed_video_${message.id}`, 0, embedIdx++);
                 }
                 else if (embed.image && embed.image.url) {
-                    await this.processMediaUrl(message, embed.image.url, 'image/embed', `embed_image_${message.id}`, 0);
+                    await this.processMediaUrl(message, embed.image.url, 'image/embed', `embed_image_${message.id}`, 0, embedIdx++);
                 }
                 else if (embed.thumbnail && embed.thumbnail.url) {
-                    await this.processMediaUrl(message, embed.thumbnail.url, 'image/embed', `embed_thumb_${message.id}`, 0);
+                    await this.processMediaUrl(message, embed.thumbnail.url, 'image/embed', `embed_thumb_${message.id}`, 0, embedIdx++);
                 }
             }
         }
 
-        // 3. Process Message Snapshots (Discord Forwards)
         if ((message as any).messageSnapshots && (message as any).messageSnapshots.size > 0) {
             const snapshots = (message as any).messageSnapshots as Collection<string, Message>;
             for (const [, snapshot] of snapshots) {
                 if (snapshot.attachments && snapshot.attachments.size > 0) {
+                    let attachIdx = 0;
                     for (const [, attachment] of snapshot.attachments) {
-                        await this.processMediaUrl(message, attachment.url, attachment.contentType, attachment.name, attachment.size, snapshot.content);
+                        await this.processMediaUrl(message, attachment.url, attachment.contentType, attachment.name, attachment.size, attachIdx++, snapshot.content);
                     }
                 }
                 if (snapshot.embeds && snapshot.embeds.length > 0) {
+                    let embedIdx = 0;
                     for (const embed of snapshot.embeds) {
                         if (embed.video && embed.video.url) {
-                            await this.processMediaUrl(message, embed.video.url, 'video/embed', `forward_video_${message.id}`, 0, snapshot.content);
+                            await this.processMediaUrl(message, embed.video.url, 'video/embed', `forward_video_${message.id}`, 0, embedIdx++, snapshot.content);
                         }
                         else if (embed.image && embed.image.url) {
-                            await this.processMediaUrl(message, embed.image.url, 'image/embed', `forward_image_${message.id}`, 0, snapshot.content);
+                            await this.processMediaUrl(message, embed.image.url, 'image/embed', `forward_image_${message.id}`, 0, embedIdx++, snapshot.content);
                         }
                         else if (embed.thumbnail && embed.thumbnail.url) {
-                            await this.processMediaUrl(message, embed.thumbnail.url, 'image/embed', `forward_thumb_${message.id}`, 0, snapshot.content);
+                            await this.processMediaUrl(message, embed.thumbnail.url, 'image/embed', `forward_thumb_${message.id}`, 0, embedIdx++, snapshot.content);
                         }
                     }
                 }
             }
         }
     }
-    async processMediaUrl(message: Message, url: string, contentType: string | null, filename: string | null, size: number, contentOverride?: string): Promise<boolean> {
+    async processMediaUrl(message: Message, url: string, contentType: string | null, filename: string | null, size: number, index: number, contentOverride?: string): Promise<boolean> {
         let type: string | null = null;
 
         // Deduction
@@ -330,6 +333,7 @@ export class DiscordService implements OnModuleInit {
                     minioUrl: minioUrl,
                     thumbnailUrl: thumbnailMinioUrl, // Store thumbnail URL
                     duration: duration, // Store video duration
+                    mediaIndex: index, // Store media index
                     discordMessageId: message.id,
                     originalChannel: message.channelId,
                     content: contentOverride ?? message.content,
