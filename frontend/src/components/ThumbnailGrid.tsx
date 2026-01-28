@@ -3,6 +3,8 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { useInView } from 'react-intersection-observer';
 import api from '../api';
 
+import axios from 'axios';
+
 const GridContainer = styled.div`
   display: grid;
   // Mobile first: smaller thumbs (2-3 per row)
@@ -445,6 +447,7 @@ export const ThumbnailGrid = () => {
     const [selectedGroup, setSelectedGroup] = useState<GroupedMedia | null>(null);
     const [selectedIndex, setSelectedIndex] = useState(0);
     const [gridSize, setGridSize] = useState(200); // Default px size
+    const [errorInfo, setErrorInfo] = useState<string | null>(null);
 
     // Header States
     const [showVideos, setShowVideos] = useState(true);
@@ -513,8 +516,15 @@ export const ThumbnailGrid = () => {
                 const newIds = newItems.map((g: GroupedMedia) => g.discordMessageId);
                 excludeIdsRef.current = [...excludeIdsRef.current, ...newIds];
             }
-        } catch (err) {
+        } catch (err: any) {
             console.error(err);
+            if (!axios.isCancel(err)) {
+                if (err.response?.status === 502 || err.code === 'ERR_NETWORK') {
+                    setErrorInfo('Backend Unavailable (502). Retrying stopped.');
+                    // Stop further random fetches? Maybe just show error.
+                    // For feed, we might want to let user retry manually?
+                }
+            }
         } finally {
             setFeedLoading(false);
             loadingRef.current = false;
@@ -526,6 +536,7 @@ export const ThumbnailGrid = () => {
         setGroups([]);
         setFeedItems([]);
         setHasMore(true);
+        setErrorInfo(null);
         excludeIdsRef.current = [];
         loadingRef.current = false;
 
@@ -586,8 +597,14 @@ export const ThumbnailGrid = () => {
                     return [...base, ...uniqueNew];
                 });
             }
-        } catch (err) {
+        } catch (err: any) {
             console.error(err);
+            if (!axios.isCancel(err)) {
+                if (err.response?.status === 502 || err.code === 'ERR_NETWORK') {
+                    setErrorInfo('Failed to connect to backend (502 / Network Error).');
+                    setHasMore(false); // Stop infinite scroll
+                }
+            }
         } finally {
             loadingRef.current = false;
             setLoading(false);
@@ -821,11 +838,11 @@ export const ThumbnailGrid = () => {
 
                     {hasMore && (
                         <Loading ref={ref} onClick={() => loadList()}>
-                            {loading ? 'Loading...' : 'Tap for more'}
+                            {errorInfo ? <span style={{ color: '#ff4444' }}>{errorInfo}</span> : (loading ? 'Loading...' : 'Tap for more')}
                         </Loading>
                     )}
 
-                    {!loading && groups.length === 0 && (
+                    {!loading && !errorInfo && groups.length === 0 && (
                         <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '100px', color: '#8b949e' }}>
                             No results found.
                         </div>
@@ -843,6 +860,7 @@ export const ThumbnailGrid = () => {
                     ))}
                     <div ref={feedRef} style={{ height: '100px', width: '100%' }}></div>
                     {feedLoading && <div style={{ color: '#8b949e', textAlign: 'center', padding: '20px' }}>Loading more...</div>}
+                    {errorInfo && <div style={{ color: '#ff4444', textAlign: 'center', padding: '20px' }}>{errorInfo}</div>}
                 </FeedContainer>
             )}
 

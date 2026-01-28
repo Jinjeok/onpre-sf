@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
+import { Injectable, OnModuleInit, Logger, Inject, forwardRef } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import sharp from 'sharp';
 import { Client, GatewayIntentBits, Message, TextChannel, Collection } from 'discord.js';
@@ -23,6 +23,7 @@ export class DiscordService implements OnModuleInit {
     constructor(
         private configService: ConfigService,
         private minioService: MinioService,
+        @Inject(forwardRef(() => MediaService))
         private mediaService: MediaService,
     ) { }
 

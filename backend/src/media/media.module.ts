@@ -1,12 +1,13 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { MediaService } from './media.service';
 import { MediaController } from './media.controller';
 import { Media } from './entities/media.entity';
 import { MinioModule } from '../minio/minio.module';
+import { DiscordModule } from '../discord/discord.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Media]), MinioModule],
+  imports: [TypeOrmModule.forFeature([Media]), MinioModule, forwardRef(() => DiscordModule)],
   controllers: [MediaController],
   providers: [MediaService],
   exports: [MediaService],

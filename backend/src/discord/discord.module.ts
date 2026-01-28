@@ -1,10 +1,11 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { DiscordService } from './discord.service';
 import { MediaModule } from '../media/media.module';
 import { MinioModule } from '../minio/minio.module';
 
 @Module({
-  imports: [MediaModule, MinioModule],
+  imports: [forwardRef(() => MediaModule), MinioModule],
   providers: [DiscordService],
+  exports: [DiscordService],
 })
 export class DiscordModule { }
