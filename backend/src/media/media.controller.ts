@@ -32,15 +32,13 @@ export class MediaController {
     @Query('limit') limit?: number,
     @Query('offset') offset?: number,
     @Query('type') type?: string,
-    @Query('sort') sort?: 'fetch' | 'discord',
-    @Query('order') order?: 'ASC' | 'DESC',
+    @Query('sort') sort?: 'fetch' | 'discord'
   ) {
     return this.mediaService.findAllGrouped(
       limit ? Number(limit) : 20,
       offset ? Number(offset) : 0,
       type,
-      sort,
-      order
+      sort
     );
   }
 

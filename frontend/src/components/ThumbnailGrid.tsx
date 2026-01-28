@@ -5,66 +5,85 @@ import api from '../api';
 import axios from 'axios';
 
 const PageContainer = styled.div`
-  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  /* Use dynamic viewport height for mobile browsers if supported */
+  height: 100dvh;
+  overflow: hidden;
   background-color: #0d1117;
 `;
 
 const GridContainer = styled.div`
   display: grid;
+  // Mobile first: smaller thumbs (2-3 per row)
   grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-  gap: 12px;
-  padding: 12px;
+  gap: 8px;
+  padding: 8px;
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
 
+  // PC: larger thumbs
   @media (min-width: 768px) {
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 24px;
-    padding: 24px;
+    gap: 16px;
+    padding: 16px;
   }
 `;
 
 const FeedContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  padding: 20px;
-  max-width: 800px;
-  margin: 0 auto;
-`;
-
-const FeedCardItem = styled.div`
-  background: #161b22;
-  border: 1px solid #30363d;
-  border-radius: 6px;
-  overflow: hidden;
-`;
-
-const FeedMediaArea = styled.div`
-  position: relative;
   width: 100%;
+  flex: 1;
+  overflow-y: scroll;
+  scroll-snap-type: y mandatory;
   background: #000;
+  position: relative;
+  min-height: 0;
+
+  /* Hide scrollbar */
+  &::-webkit-scrollbar { display: none; }
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+`;
+
+const FeedItem = styled.div`
+  width: 100%;
+  height: 100%;
+  scroll-snap-align: start;
+  position: relative;
   display: flex;
   justify-content: center;
   align-items: center;
+  background: #000;
+`;
 
-  img, video {
-    max-width: 100%;
-    max-height: 80vh; 
-    width: auto;
-    height: auto;
-    display: block;
-  }
+const FeedContent = styled.div`
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+
+    img, video {
+        max-width: 100%;
+        max-height: 100%;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+    }
 `;
 
 const Header = styled.header`
-  padding: 16px;
+  padding: 12px 16px;
   background: #161b22;
   border-bottom: 1px solid #30363d;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  position: sticky;
-  top: 0;
   z-index: 100;
+  flex-shrink: 0;
 
   @media (min-width: 768px) {
     flex-direction: row;
@@ -80,27 +99,27 @@ const Thumbnail = styled.div`
   overflow: hidden;
   background-color: #222;
   cursor: pointer;
-  border: 1px solid #30363d;
+  border: 1px solid #333;
+  transition: transform 0.2s, box-shadow 0.2s;
 
-  /* Collage Support - Grid applied directly to Thumbnail */
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    z-index: 10;
+  }
+
+  /* Collage Support */
   display: grid;
-  gap: 2px;
-  
-  &.collage-1 { grid-template-columns: 1fr; gap: 0; }
+  &.collage-1 { grid-template-columns: 1fr; }
   &.collage-2 { grid-template-columns: 1fr 1fr; }
   &.collage-3 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; } 
-  &.collage-3 > :first-child { grid-row: 1 / -1; }
+  &.collage-3 > :first-child { grid-row: 1 / -1; } /* Left half big */
   &.collage-4 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+
+  /* 5-9: 3x3 grid */
   &.collage-multi { 
       grid-template-columns: repeat(3, 1fr); 
       grid-template-rows: repeat(3, 1fr); 
-  }
-  
-  &:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-    z-index: 10;
-    border-color: #58a6ff;
   }
 `;
 
@@ -490,7 +509,6 @@ export const ThumbnailGrid = () => {
     const [selectedIndex, setSelectedIndex] = useState(0);
     const [gridSize, setGridSize] = useState(200);
     const [sortBy, setSortBy] = useState<'fetch' | 'discord'>('fetch');
-    const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
     const [errorInfo, setErrorInfo] = useState<string | null>(null);
 
     const [showVideos, setShowVideos] = useState(true);
@@ -571,7 +589,7 @@ export const ThumbnailGrid = () => {
         } else {
             loadFeed();
         }
-    }, [viewMode, loadFeed, sortBy, sortOrder]);
+    }, [viewMode, loadFeed, sortBy]);
 
     useEffect(() => {
         if (viewMode === 'list' && inView && hasMore && !loading) {
@@ -580,7 +598,7 @@ export const ThumbnailGrid = () => {
         if (viewMode === 'feed' && feedInView && !feedLoading) {
             loadFeed();
         }
-    }, [inView, feedInView, hasMore, loading, feedLoading, viewMode, loadFeed, sortBy, sortOrder]);
+    }, [inView, feedInView, hasMore, loading, feedLoading, viewMode, loadFeed, sortBy]);
 
     const loadList = async (isReset = false) => {
         if (loadingRef.current || (!hasMore && !isReset)) return;
@@ -605,8 +623,7 @@ export const ThumbnailGrid = () => {
                     limit,
                     offset: currentOffset,
                     type: typeParam,
-                    sort: sortBy,
-                    order: sortOrder
+                    sort: sortBy
                 }
             });
             const newGroups = response.data;
@@ -813,33 +830,15 @@ export const ThumbnailGrid = () => {
                     <ControlGroup>
                         <ToggleButton
                             $active={sortBy === 'fetch'}
-                            onClick={() => {
-                                if (sortBy === 'fetch') {
-                                    setSortOrder(prev => prev === 'DESC' ? 'ASC' : 'DESC');
-                                } else {
-                                    setSortBy('fetch');
-                                    setSortOrder('DESC');
-                                }
-                                setGroups([]);
-                                setHasMore(true);
-                            }}
+                            onClick={() => { setSortBy('fetch'); setGroups([]); setHasMore(true); }}
                         >
-                            Sort: Fetch {sortBy === 'fetch' ? (sortOrder === 'DESC' ? '↓' : '↑') : ''}
+                            Sort: Fetch
                         </ToggleButton>
                         <ToggleButton
                             $active={sortBy === 'discord'}
-                            onClick={() => {
-                                if (sortBy === 'discord') {
-                                    setSortOrder(prev => prev === 'DESC' ? 'ASC' : 'DESC');
-                                } else {
-                                    setSortBy('discord');
-                                    setSortOrder('DESC');
-                                }
-                                setGroups([]);
-                                setHasMore(true);
-                            }}
+                            onClick={() => { setSortBy('discord'); setGroups([]); setHasMore(true); }}
                         >
-                            Sort: Date {sortBy === 'discord' ? (sortOrder === 'DESC' ? '↓' : '↑') : ''}
+                            Sort: Date
                         </ToggleButton>
                     </ControlGroup>
                 )}
@@ -911,6 +910,8 @@ export const ThumbnailGrid = () => {
                                     );
                                 })}
 
+                                {count === 1 && <TypeBadge>{group.media[0].type}</TypeBadge>}
+                                {count > 1 && <TypeBadge style={{ background: '#444' }}>x{count}</TypeBadge>}
                             </Thumbnail>
                         );
                     })}
