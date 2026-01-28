@@ -16,10 +16,10 @@ const PageContainer = styled.div`
 
 const GridContainer = styled.div`
   display: grid;
-  // Mobile first: smaller thumbs (2-3 per row)
+  // Mobile first
   grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-  gap: 8px;
-  padding: 8px;
+  gap: 12px;
+  padding: 12px;
   flex: 1;
   overflow-y: auto;
   min-height: 0;
@@ -27,8 +27,8 @@ const GridContainer = styled.div`
   // PC: larger thumbs
   @media (min-width: 768px) {
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 16px;
-    padding: 16px;
+    gap: 20px;
+    padding: 20px;
   }
 `;
 
@@ -65,12 +65,14 @@ const FeedContent = styled.div`
     justify-content: center;
     align-items: center;
     position: relative;
+    padding: 15px; /* Add some breathing room */
+    box-sizing: border-box;
 
     img, video {
         max-width: 100%;
         max-height: 100%;
-        width: 100%;
-        height: 100%;
+        width: auto;
+        height: auto;
         object-fit: contain;
     }
 `;
@@ -110,7 +112,8 @@ const Thumbnail = styled.div`
 
   /* Collage Support */
   display: grid;
-  &.collage-1 { grid-template-columns: 1fr; }
+  gap: 2px; /* Add small gap between collage items */
+  &.collage-1 { grid-template-columns: 1fr; gap: 0; }
   &.collage-2 { grid-template-columns: 1fr 1fr; }
   &.collage-3 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; } 
   &.collage-3 > :first-child { grid-row: 1 / -1; } /* Left half big */
