@@ -38,11 +38,33 @@ const Thumbnail = styled.div`
     z-index: 10;
   }
 
-  img, video {
+  /* Collage Support */
+  display: grid;
+  &.collage-1 { grid-template-columns: 1fr; }
+  &.collage-2 { grid-template-columns: 1fr 1fr; }
+  &.collage-3 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; } 
+  &.collage-3 > :first-child { grid-row: 1 / -1; } /* Left half big */
+  &.collage-4 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+
+  /* 5-9: 3x3 grid */
+  &.collage-multi { 
+      grid-template-columns: repeat(3, 1fr); 
+      grid-template-rows: repeat(3, 1fr); 
+  }
+`;
+
+const CollageImage = styled.img`
     width: 100%;
     height: 100%;
     object-fit: cover;
-  }
+    display: block;
+`;
+
+const CollageVideo = styled.video`
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
 `;
 
 const TypeBadge = styled.div`
@@ -76,14 +98,17 @@ const DurationBadge = styled.div`
   position: absolute;
   bottom: 6px;
   right: 6px;
-  background: rgba(0, 0, 0, 0.85);
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(2px);
   color: white;
-  padding: 2px 6px;
+  padding: 3px 6px;
   border-radius: 4px;
   font-size: 11px;
-  font-weight: 600;
-  z-index: 2;
-  font-family: monospace;
+  font-weight: 500;
+  z-index: 5;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  letter-spacing: 0.5px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.3);
 `;
 
 const formatDuration = (seconds?: number) => {
@@ -482,6 +507,7 @@ export const ThumbnailGrid = () => {
     const [selectedGroup, setSelectedGroup] = useState<GroupedMedia | null>(null);
     const [selectedIndex, setSelectedIndex] = useState(0);
     const [gridSize, setGridSize] = useState(200); // Default px size
+    const [sortBy, setSortBy] = useState<'fetch' | 'discord'>('fetch');
     const [errorInfo, setErrorInfo] = useState<string | null>(null);
 
     // Header States
@@ -580,7 +606,7 @@ export const ThumbnailGrid = () => {
         } else {
             loadFeed();
         }
-    }, [viewMode, loadFeed]); // loadFeed depends on filters, so this triggers on filter change too
+    }, [viewMode, loadFeed, sortBy]); // Added sortBy
 
     useEffect(() => {
         if (viewMode === 'list' && inView && hasMore && !loading) {
@@ -589,7 +615,7 @@ export const ThumbnailGrid = () => {
         if (viewMode === 'feed' && feedInView && !feedLoading) {
             loadFeed();
         }
-    }, [inView, feedInView, hasMore, loading, feedLoading, viewMode, loadFeed]);
+    }, [inView, feedInView, hasMore, loading, feedLoading, viewMode, loadFeed, sortBy]);
 
     const loadList = async (isReset = false) => {
         if (loadingRef.current || (!hasMore && !isReset)) return;
@@ -614,7 +640,8 @@ export const ThumbnailGrid = () => {
                 params: {
                     limit,
                     offset: currentOffset,
-                    type: typeParam
+                    type: typeParam,
+                    sort: sortBy
                 }
             });
             const newGroups = response.data;
@@ -835,6 +862,22 @@ export const ThumbnailGrid = () => {
 
                 {viewMode === 'list' && (
                     <ControlGroup>
+                        <ToggleButton
+                            $active={sortBy === 'fetch'}
+                            onClick={() => { setSortBy('fetch'); setGroups([]); setHasMore(true); }}
+                        >
+                            Sort: Fetch
+                        </ToggleButton>
+                        <ToggleButton
+                            $active={sortBy === 'discord'}
+                            onClick={() => { setSortBy('discord'); setGroups([]); setHasMore(true); }}
+                        >
+                            Sort: Date
+                        </ToggleButton>
+                    </ControlGroup>
+                )}
+                {viewMode === 'list' && (
+                    <ControlGroup>
                         <SliderLabel>
                             Size:
                             <RangeInput
@@ -853,23 +896,58 @@ export const ThumbnailGrid = () => {
             {viewMode === 'list' ? (
                 <GridContainer style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${gridSize}px, 1fr))` }}>
                     {groups.map(group => {
-                        const cover = group.media[0];
+                        const count = group.media.length;
+                        let collageClass = 'collage-1';
+                        if (count === 2) collageClass = 'collage-2';
+                        else if (count === 3) collageClass = 'collage-3';
+                        else if (count === 4) collageClass = 'collage-4';
+                        else if (count >= 5) collageClass = 'collage-multi';
+
+                        // Limit to 9 for 3x3 grid
+                        const displayItems = group.media.slice(0, 9);
+                        const remainder = count - 9;
+
                         return (
-                            <Thumbnail key={group.discordMessageId} onClick={() => handleGroupClick(group)}>
-                                <TypeBadge>{cover.type}</TypeBadge>
-                                {group.media.length > 1 && (
-                                    <CountBadge>1/{group.media.length}</CountBadge>
-                                )}
-                                {cover.type === 'video' && cover.duration && (
-                                    <DurationBadge>{formatDuration(cover.duration)}</DurationBadge>
-                                )}
-                                {cover.thumbnailUrl ? (
-                                    <img src={getFullUrl(cover.thumbnailUrl)} alt="cover" loading="lazy" />
-                                ) : cover.type === 'video' ? (
-                                    <video src={getFullUrl(cover.minioUrl)} muted loop />
-                                ) : (
-                                    <img src={getFullUrl(cover.minioUrl)} alt="cover" loading="lazy" />
-                                )}
+                            <Thumbnail
+                                key={group.discordMessageId}
+                                onClick={() => handleGroupClick(group)}
+                                className={collageClass}
+                            >
+                                {displayItems.map((item, idx) => {
+                                    const isVideo = item.type === 'video';
+                                    const showOverlay = idx === 8 && remainder > 0;
+
+                                    return (
+                                        <div key={item.id} style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }}>
+                                            {item.thumbnailUrl ? (
+                                                <CollageImage src={getFullUrl(item.thumbnailUrl)} alt="thumb" loading="lazy" />
+                                            ) : isVideo ? (
+                                                <CollageVideo src={getFullUrl(item.minioUrl)} muted loop />
+                                            ) : (
+                                                <CollageImage src={getFullUrl(item.minioUrl)} alt="thumb" loading="lazy" />
+                                            )}
+
+                                            {/* Duration on first item only if it's the only item, or maybe small badges? */}
+                                            {count === 1 && isVideo && item.duration && (
+                                                <DurationBadge>{formatDuration(item.duration)}</DurationBadge>
+                                            )}
+
+                                            {showOverlay && (
+                                                <div style={{
+                                                    position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)',
+                                                    color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                    fontSize: '18px', fontWeight: 'bold'
+                                                }}>
+                                                    +{remainder}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+
+                                {count === 1 && <TypeBadge>{group.media[0].type}</TypeBadge>}
+                                {count > 1 && <TypeBadge style={{ background: '#444' }}>x{count}</TypeBadge>}
+                                {/* Keep count badge as TypeBadge replacement or addition? User asks for split view. */}
                             </Thumbnail>
                         );
                     })}

@@ -52,15 +52,21 @@ export class MediaService {
     });
   }
 
-  async findAllGrouped(limit: number = 20, offset: number = 0, type?: string) {
+  async findAllGrouped(limit: number = 20, offset: number = 0, type?: string, sortBy: 'fetch' | 'discord' = 'fetch') {
     // 1. Get distinct message IDs with pagination
     const query = this.mediaRepository.createQueryBuilder('media')
       .select('media.discordMessageId')
-      .addSelect('MAX(media.createdAt)', 'latest')
+      .addSelect('MAX(media.createdAt)', 'latestFetch')
+      .addSelect('MAX(media.discordCreatedAt)', 'latestDiscord')
       .groupBy('media.discordMessageId')
-      .orderBy('latest', 'DESC')
       .limit(limit)
       .offset(offset);
+
+    if (sortBy === 'discord') {
+      query.orderBy('latestDiscord', 'DESC');
+    } else {
+      query.orderBy('latestFetch', 'DESC');
+    }
 
     if (type) {
       query.where('media.type = :type', { type });

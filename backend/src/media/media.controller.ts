@@ -31,12 +31,14 @@ export class MediaController {
   getList(
     @Query('limit') limit?: number,
     @Query('offset') offset?: number,
-    @Query('type') type?: string
+    @Query('type') type?: string,
+    @Query('sort') sort?: 'fetch' | 'discord'
   ) {
     return this.mediaService.findAllGrouped(
       limit ? Number(limit) : 20,
       offset ? Number(offset) : 0,
-      type
+      type,
+      sort
     );
   }
 
