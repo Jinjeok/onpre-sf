@@ -179,7 +179,7 @@ const useDraggableScroll = () => {
         if (!isDragging || !ref.current) return;
         e.preventDefault();
         const x = e.pageX - ref.current.offsetLeft;
-        const walk = (x - startX) * 2; // scroll-fast
+        const walk = (x - startX) * 4; // scroll-fast x2
         ref.current.scrollLeft = scrollLeft - walk;
     };
 
@@ -299,16 +299,16 @@ const NavButton = styled.button`
   background: rgba(0,0,0,0.3);
   border: none;
   color: white;
-  font-size: 30px;
+  font-size: 20px;
   cursor: pointer;
-  padding: 20px;
+  padding: 0;
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
   z-index: 1005;
   border-radius: 50%;
-  width: 60px;
-  height: 60px;
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -318,6 +318,10 @@ const NavButton = styled.button`
   
   &.prev { left: 10px; }
   &.next { right: 10px; }
+
+  @media (max-width: 768px) {
+    display: none;
+  }
 `;
 
 const CloseButton = styled.button`
