@@ -508,6 +508,7 @@ export const ThumbnailGrid = () => {
     const [selectedIndex, setSelectedIndex] = useState(0);
     const [gridSize, setGridSize] = useState(200); // Default px size
     const [sortBy, setSortBy] = useState<'fetch' | 'discord'>('fetch');
+    const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
     const [errorInfo, setErrorInfo] = useState<string | null>(null);
 
     // Header States
@@ -606,7 +607,7 @@ export const ThumbnailGrid = () => {
         } else {
             loadFeed();
         }
-    }, [viewMode, loadFeed, sortBy]); // Added sortBy
+    }, [viewMode, loadFeed, sortBy, sortOrder]); // Added sortOrder
 
     useEffect(() => {
         if (viewMode === 'list' && inView && hasMore && !loading) {
@@ -615,7 +616,7 @@ export const ThumbnailGrid = () => {
         if (viewMode === 'feed' && feedInView && !feedLoading) {
             loadFeed();
         }
-    }, [inView, feedInView, hasMore, loading, feedLoading, viewMode, loadFeed, sortBy]);
+    }, [inView, feedInView, hasMore, loading, feedLoading, viewMode, loadFeed, sortBy, sortOrder]);
 
     const loadList = async (isReset = false) => {
         if (loadingRef.current || (!hasMore && !isReset)) return;
@@ -641,7 +642,8 @@ export const ThumbnailGrid = () => {
                     limit,
                     offset: currentOffset,
                     type: typeParam,
-                    sort: sortBy
+                    sort: sortBy,
+                    order: sortOrder
                 }
             });
             const newGroups = response.data;
@@ -864,15 +866,33 @@ export const ThumbnailGrid = () => {
                     <ControlGroup>
                         <ToggleButton
                             $active={sortBy === 'fetch'}
-                            onClick={() => { setSortBy('fetch'); setGroups([]); setHasMore(true); }}
+                            onClick={() => {
+                                if (sortBy === 'fetch') {
+                                    setSortOrder(prev => prev === 'DESC' ? 'ASC' : 'DESC');
+                                } else {
+                                    setSortBy('fetch');
+                                    setSortOrder('DESC');
+                                }
+                                setGroups([]);
+                                setHasMore(true);
+                            }}
                         >
-                            Sort: Fetch
+                            Sort: Fetch {sortBy === 'fetch' && (sortOrder === 'DESC' ? '↓' : '↑')}
                         </ToggleButton>
                         <ToggleButton
                             $active={sortBy === 'discord'}
-                            onClick={() => { setSortBy('discord'); setGroups([]); setHasMore(true); }}
+                            onClick={() => {
+                                if (sortBy === 'discord') {
+                                    setSortOrder(prev => prev === 'DESC' ? 'ASC' : 'DESC');
+                                } else {
+                                    setSortBy('discord');
+                                    setSortOrder('DESC');
+                                }
+                                setGroups([]);
+                                setHasMore(true);
+                            }}
                         >
-                            Sort: Date
+                            Sort: Date {sortBy === 'discord' && (sortOrder === 'DESC' ? '↓' : '↑')}
                         </ToggleButton>
                     </ControlGroup>
                 )}

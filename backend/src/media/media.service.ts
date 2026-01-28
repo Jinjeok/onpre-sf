@@ -52,7 +52,7 @@ export class MediaService {
     });
   }
 
-  async findAllGrouped(limit: number = 20, offset: number = 0, type?: string, sortBy: 'fetch' | 'discord' = 'fetch') {
+  async findAllGrouped(limit: number = 20, offset: number = 0, type?: string, sortBy: 'fetch' | 'discord' = 'fetch', sortOrder: 'ASC' | 'DESC' = 'DESC') {
     // 1. Get distinct message IDs with pagination
     const query = this.mediaRepository.createQueryBuilder('media')
       .select('media.discordMessageId')
@@ -63,9 +63,9 @@ export class MediaService {
       .offset(offset);
 
     if (sortBy === 'discord') {
-      query.orderBy('latest_discord', 'DESC');
+      query.orderBy('latest_discord', sortOrder);
     } else {
-      query.orderBy('latest_fetch', 'DESC');
+      query.orderBy('latest_fetch', sortOrder);
     }
 
     if (type) {
