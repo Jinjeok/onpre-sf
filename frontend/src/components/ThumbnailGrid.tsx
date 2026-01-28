@@ -521,7 +521,138 @@ export const ThumbnailGrid = () => {
         }
     }, [inView, feedInView, hasMore, loading, feedLoading, viewMode, loadFeed]);
 
-    // ... (rest of simple functions) ...
+    const loadList = async (isReset = false) => {
+        if (loadingRef.current || (!hasMore && !isReset)) return;
+        loadingRef.current = true;
+        setLoading(true);
+
+        try {
+            const currentOffset = isReset ? 0 : groups.length;
+            const limit = 20;
+
+            // Determine type filter
+            let typeParam: string | undefined = undefined;
+            if (showVideos && !showImages) typeParam = 'video';
+            if (!showVideos && showImages) typeParam = 'image';
+            if (!showVideos && !showImages) {
+                setGroups([]);
+                setHasMore(false);
+                return;
+            }
+
+            const response = await api.get('/feed/list', {
+                params: {
+                    limit,
+                    offset: currentOffset,
+                    type: typeParam
+                }
+            });
+            const newGroups = response.data;
+
+            if (newGroups.length === 0) {
+                if (isReset) setGroups([]);
+                setHasMore(false);
+            } else {
+                if (newGroups.length < limit) setHasMore(false);
+
+                setGroups(prev => {
+                    const base = isReset ? [] : prev;
+                    const existingIds = new Set(base.map(g => g.discordMessageId));
+                    const uniqueNew = newGroups.filter((g: GroupedMedia) => !existingIds.has(g.discordMessageId));
+                    return [...base, ...uniqueNew];
+                });
+            }
+        } catch (err) {
+            console.error(err);
+        } finally {
+            loadingRef.current = false;
+            setLoading(false);
+        }
+    };
+
+    const handleReportError = async (id: string) => {
+        console.warn(`[ThumbnailGrid] Reporting media error for id: ${id}`);
+        try {
+            await api.get(`/feed/error/${id}`);
+        } catch (e) {
+            console.error('[ThumbnailGrid] Failed to report error:', e);
+        }
+
+        if (viewMode === 'feed') {
+            setFeedItems(prev => {
+                return prev.map(g => ({
+                    ...g,
+                    media: g.media.filter(m => m.id !== id)
+                })).filter(g => g.media.length > 0);
+            });
+        }
+    };
+
+    const getFullUrl = (url: string) => {
+        let finalUrl = url;
+        const token = localStorage.getItem('token');
+        const tokenSuffix = token ? `&token=${token}` : '';
+
+        if (finalUrl.includes('/feed/media/') && !finalUrl.includes('?key=')) {
+            const parts = finalUrl.split('/feed/media/');
+            if (parts.length === 2) {
+                const key = parts[1];
+                finalUrl = `/feed/media?key=${encodeURIComponent(key)}${tokenSuffix}`;
+            }
+        } else if (finalUrl.includes('/feed/media?key=')) {
+            // Already converted but might need token
+            if (!finalUrl.includes('&token=')) {
+                finalUrl += tokenSuffix;
+            }
+        }
+
+        if (finalUrl.startsWith('http')) return finalUrl;
+        const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+        return `${baseUrl}${finalUrl}`;
+    };
+
+    const handleGroupClick = (group: GroupedMedia) => {
+        setSelectedGroup(group);
+        setSelectedIndex(0);
+    };
+
+    const handleNext = (e?: React.MouseEvent) => {
+        e?.stopPropagation();
+        if (!selectedGroup) return;
+        setSelectedIndex(prev => (prev + 1) % selectedGroup.media.length);
+    };
+
+    const handlePrev = (e?: React.MouseEvent) => {
+        e?.stopPropagation();
+        if (!selectedGroup) return;
+        setSelectedIndex(prev => (prev - 1 + selectedGroup.media.length) % selectedGroup.media.length);
+    };
+
+    // Touch Handling for Swipe
+    const touchStartX = useRef(0);
+    const touchEndX = useRef(0);
+
+    const handleTouchStart = (e: React.TouchEvent) => {
+        touchStartX.current = e.targetTouches[0].clientX;
+    };
+
+    const handleTouchMove = (e: React.TouchEvent) => {
+        touchEndX.current = e.targetTouches[0].clientX;
+    };
+
+    const handleTouchEnd = () => {
+        if (!touchStartX.current || !touchEndX.current) return;
+        const diff = touchStartX.current - touchEndX.current;
+        const threshold = 50;
+
+        if (diff > threshold) {
+            handleNext();
+        } else if (diff < -threshold) {
+            handlePrev();
+        }
+        touchStartX.current = 0;
+        touchEndX.current = 0;
+    };
 
     // Keyboard Navigation for Feed
     useEffect(() => {
