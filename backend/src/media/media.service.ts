@@ -56,16 +56,16 @@ export class MediaService {
     // 1. Get distinct message IDs with pagination
     const query = this.mediaRepository.createQueryBuilder('media')
       .select('media.discordMessageId')
-      .addSelect('MAX(media.createdAt)', 'latestFetch')
-      .addSelect('MAX(media.discordCreatedAt)', 'latestDiscord')
+      .addSelect('MAX(media.createdAt)', 'latest_fetch')
+      .addSelect('MAX(media.discordCreatedAt)', 'latest_discord')
       .groupBy('media.discordMessageId')
       .limit(limit)
       .offset(offset);
 
     if (sortBy === 'discord') {
-      query.orderBy('latestDiscord', 'DESC');
+      query.orderBy('latest_discord', 'DESC');
     } else {
-      query.orderBy('latestFetch', 'DESC');
+      query.orderBy('latest_fetch', 'DESC');
     }
 
     if (type) {
