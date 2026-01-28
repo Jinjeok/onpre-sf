@@ -219,7 +219,7 @@ export class DiscordService implements OnModuleInit {
             if (!response.body) throw new Error('Response body is null');
             const nodeStream = this.convertWebStreamToNodeStream(response.body as unknown as ReadableStream<any>);
             await new Promise((resolve, reject) => {
-                fileStream.on('finish', resolve);
+                fileStream.on('finish', () => resolve(true));
                 fileStream.on('error', reject);
                 nodeStream.pipe(fileStream);
                 nodeStream.on('error', reject);
