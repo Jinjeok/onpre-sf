@@ -16,6 +16,10 @@ export class MediaService {
     return this.mediaRepository.save(media);
   }
 
+  async findOne(id: string) {
+    return this.mediaRepository.findOneBy({ id });
+  }
+
   async existsByDiscordMessageId(discordMessageId: string): Promise<boolean> {
     const count = await this.mediaRepository.count({
       where: { discordMessageId },

@@ -737,6 +737,17 @@ export const ThumbnailGrid = () => {
         }
     };
 
+    const handleRedownload = async (id: string) => {
+        if (!confirm('Re-download this media? This will delete the current file and fetch it again from Discord.')) return;
+        try {
+            await api.post(`/feed/${id}/redownload`);
+            alert('Redownload started! Please refresh in a moment.');
+        } catch (err) {
+            console.error('Failed to redownload:', err);
+            alert('Failed to redownload.');
+        }
+    };
+
     return (
         <>
             <Header>
@@ -890,6 +901,21 @@ export const ThumbnailGrid = () => {
                                     >
                                         Discord
                                     </ButtonLink>
+                                    <button
+                                        style={{
+                                            background: '#2ba44e',
+                                            border: 'none',
+                                            color: 'white',
+                                            padding: '6px 12px',
+                                            borderRadius: '6px',
+                                            cursor: 'pointer',
+                                            fontSize: '12px',
+                                            fontWeight: 'bold'
+                                        }}
+                                        onClick={() => handleRedownload(selectedGroup.media[selectedIndex].id)}
+                                    >
+                                        Re-download
+                                    </button>
                                     <button
                                         style={{
                                             background: '#da3633',

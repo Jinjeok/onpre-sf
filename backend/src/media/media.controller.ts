@@ -4,12 +4,21 @@ import type { Request, Response } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { MinioService } from '../minio/minio.service';
 
+import { DiscordService } from '../discord/discord.service';
+
 @Controller('feed')
 export class MediaController {
   constructor(
     private readonly mediaService: MediaService,
-    private readonly minioService: MinioService
+    private readonly minioService: MinioService,
+    private readonly discordService: DiscordService
   ) { }
+
+  @Post(':id/redownload')
+  @UseGuards(JwtAuthGuard)
+  async redownload(@Param('id') id: string) {
+    return this.discordService.redownloadMedia(id);
+  }
 
   @Get()
   @UseGuards(JwtAuthGuard)

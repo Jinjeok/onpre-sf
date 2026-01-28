@@ -241,38 +241,8 @@ export class DiscordService implements OnModuleInit {
             let uploadBuffer = fileBuffer;
             let streamSize = fileBuffer.length;
 
-            // Video Trimming Logic
-            if (type === 'video') {
-                const tempOutput = path.join(os.tmpdir(), `${uniqueId}_output.mp4`);
-                try {
-                    await new Promise((resolve, reject) => {
-                        ffmpeg(tempInput)
-                            .ffprobe((err, metadata) => {
-                                if (err) return reject(err);
-                                const duration = metadata.format.duration || 0;
-                                if (duration > 60) {
-                                    this.logger.log(`Trimming video ${cleanName} (Duration: ${duration}s)`);
-                                    ffmpeg(tempInput)
-                                        .setDuration(60)
-                                        .output(tempOutput)
-                                        .on('end', resolve)
-                                        .on('error', reject)
-                                        .run();
-                                } else {
-                                    resolve(false);
-                                }
-                            });
-                    });
-
-                    if (fs.existsSync(tempOutput)) {
-                        uploadBuffer = fs.readFileSync(tempOutput);
-                        streamSize = uploadBuffer.length;
-                        await unlinkAsync(tempOutput).catch(() => { });
-                    }
-                } catch (videoError) {
-                    this.logger.error(`FFmpeg processing failed for ${url}: ${videoError.message}. Uploading original.`);
-                }
-            }
+            // Video Trimming Logic - REMOVED (User requested full video)
+            // if (type === 'video') { ... }
 
             await this.minioService.uploadFile(objectName, uploadBuffer, streamSize, {
                 'Content-Type': contentType || (type === 'video' ? 'video/mp4' : 'image/jpeg'),
@@ -378,5 +348,33 @@ export class DiscordService implements OnModuleInit {
 
         pump();
         return nodeStream;
+    }
+
+    async redownloadMedia(id: string) {
+        // 1. Find existing media to get message coordinates
+        const media = await this.mediaService.findOne(id);
+        if (!media) throw new Error('Media not found');
+
+        const { originalChannel, discordMessageId } = media;
+
+        // 2. Delete existing record and file (Clean slate)
+        await this.mediaService.deleteMedia(id);
+
+        try {
+            // 3. Fetch original message
+            const channel = await this.client.channels.fetch(originalChannel) as TextChannel;
+            if (!channel) throw new Error('Channel not found');
+
+            const message = await channel.messages.fetch(discordMessageId);
+            if (!message) throw new Error('Message not found on Discord');
+
+            // 4. Re-process
+            this.logger.log(`Redownloading media for message ${discordMessageId}...`);
+            await this.handleMessage(message);
+            return { success: true };
+        } catch (error) {
+            this.logger.error(`Failed to redownload media ${id}: ${error.message}`);
+            throw error;
+        }
     }
 }
