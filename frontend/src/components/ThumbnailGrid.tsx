@@ -125,6 +125,73 @@ const formatDuration = (seconds?: number) => {
     return parts.join(':');
 };
 
+const HorizontalScroll = styled.div`
+  display: flex;
+  width: 100%;
+  height: 100%;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
+  -ms-overflow-style: none;
+  cursor: grab;
+  &:active { cursor: grabbing; }
+`;
+
+const HorizontalItem = styled.div`
+  flex: 0 0 100%;
+  width: 100%;
+  height: 100%;
+  scroll-snap-align: center;
+  scroll-snap-stop: always;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+`;
+
+/**
+ * Custom hook to enable dragging scroll with mouse
+ */
+const useDraggableScroll = () => {
+    const ref = useRef<HTMLDivElement>(null);
+    const [isDragging, setIsDragging] = useState(false);
+    const [startX, setStartX] = useState(0);
+    const [scrollLeft, setScrollLeft] = useState(0);
+
+    const onMouseDown = (e: React.MouseEvent) => {
+        if (!ref.current) return;
+        setIsDragging(true);
+        setStartX(e.pageX - ref.current.offsetLeft);
+        setScrollLeft(ref.current.scrollLeft);
+    };
+
+    const onMouseLeave = () => {
+        setIsDragging(false);
+    };
+
+    const onMouseUp = () => {
+        setIsDragging(false);
+    };
+
+    const onMouseMove = (e: React.MouseEvent) => {
+        if (!isDragging || !ref.current) return;
+        e.preventDefault();
+        const x = e.pageX - ref.current.offsetLeft;
+        const walk = (x - startX) * 2; // scroll-fast
+        ref.current.scrollLeft = scrollLeft - walk;
+    };
+
+    return {
+        ref,
+        onMouseDown,
+        onMouseLeave,
+        onMouseUp,
+        onMouseMove
+    };
+};
+
 const Loading = styled.div`
   grid-column: 1 / -1;
   text-align: center;
@@ -281,6 +348,7 @@ const FeedContainer = styled.div`
   height: calc(100vh - 65px); // Header height approx
   overflow-y: scroll;
   scroll-snap-type: y mandatory;
+  overscroll-behavior-y: contain;
   background: #000;
   position: relative;
 
@@ -294,6 +362,7 @@ const FeedItem = styled.div`
   width: 100%;
   height: 100%;
   scroll-snap-align: start;
+  scroll-snap-stop: always;
   position: relative;
   display: flex;
   justify-content: center;
@@ -323,100 +392,108 @@ const FeedContent = styled.div`
 const FeedCard = ({ group, getFullUrl, onReportError }: { group: GroupedMedia, getFullUrl: (u: string) => string, onReportError: (id: string) => void }) => {
     const [index, setIndex] = useState(0);
     const videoRef = useRef<HTMLVideoElement>(null);
-    const { ref, inView } = useInView({
-        threshold: 0.6,
-    });
+    const { ref: inViewRef, inView } = useInView({ threshold: 0.6 });
+    const { ref: scrollRef, ...dragProps } = useDraggableScroll();
 
+    // Sync index based on scroll position
+    const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+        const target = e.currentTarget;
+        const newIndex = Math.round(target.scrollLeft / target.clientWidth);
+        if (newIndex !== index) setIndex(newIndex);
+    };
+
+    // Keep video logic, but only for the CURRENT item in visual field
     useEffect(() => {
         if (videoRef.current) {
             videoRef.current.volume = 0.5;
             if (inView) {
-                videoRef.current.play().catch(() => {
-                    // Autoplay might be blocked if no user interaction yet
-                });
+                videoRef.current.play().catch(() => { });
             } else {
                 videoRef.current.pause();
-                videoRef.current.currentTime = 0; // Optional: Reset to start when out of view
+                videoRef.current.currentTime = 0;
             }
         }
     }, [inView, index]);
 
+    const scrollTo = (idx: number) => {
+        if (scrollRef.current) {
+            scrollRef.current.scrollTo({
+                left: idx * scrollRef.current.clientWidth,
+                behavior: 'smooth'
+            });
+        }
+    };
+
     const handleNext = (e: React.MouseEvent) => {
         e.stopPropagation();
-        if (selectedGroup) {
-            setSelectedIndex((prev) => (prev + 1) % selectedGroup.media.length);
-            setIsZoomed(false);
-        }
+        const next = (index + 1) % group.media.length;
+        scrollTo(next);
     };
 
     const handlePrev = (e: React.MouseEvent) => {
         e.stopPropagation();
-        if (selectedGroup) {
-            setSelectedIndex((prev) => (prev - 1 + selectedGroup.media.length) % selectedGroup.media.length);
-            setIsZoomed(false);
-        }
+        const prev = (index - 1 + group.media.length) % group.media.length;
+        scrollTo(prev);
     };
 
     // Keyboard Navigation (Horizontal)
     useEffect(() => {
         if (!inView) return;
-
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === 'ArrowLeft') {
                 e.preventDefault();
-                setIndex((prev) => (prev - 1 + group.media.length) % group.media.length);
+                handlePrev({ stopPropagation: () => { } } as any);
             } else if (e.key === 'ArrowRight') {
                 e.preventDefault();
-                setIndex((prev) => (prev + 1) % group.media.length);
+                handleNext({ stopPropagation: () => { } } as any);
             }
         };
-
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [inView, group.media.length]);
-
-    const currentItem = group.media[index];
+    }, [inView, index, group.media.length]);
 
     return (
-        <FeedItem ref={ref}>
-            <FeedContent>
-                {group.media.length > 1 && (
-                    <CountBadge style={{ top: '10px', right: '10px', fontSize: '12px', padding: '4px 8px' }}>
+        <FeedItem ref={inViewRef}>
+            <HorizontalScroll
+                ref={scrollRef}
+                onScroll={handleScroll}
+                {...dragProps}
+            >
+                {group.media.map((item, mIdx) => (
+                    <HorizontalItem key={item.id}>
+                        <FeedContent>
+                            {item.type === 'video' ? (
+                                <video
+                                    ref={mIdx === index ? videoRef : null}
+                                    src={getFullUrl(item.minioUrl)}
+                                    controls
+                                    loop
+                                    playsInline
+                                    onError={() => onReportError(item.id)}
+                                />
+                            ) : (
+                                <img
+                                    src={getFullUrl(item.minioUrl)}
+                                    alt="feed"
+                                    onError={() => onReportError(item.id)}
+                                />
+                            )}
+
+
+                        </FeedContent>
+                    </HorizontalItem>
+                ))}
+            </HorizontalScroll>
+
+            {group.media.length > 1 && (
+                <>
+                    <CountBadge style={{ top: '10px', right: '10px', fontSize: '12px', padding: '4px 8px', pointerEvents: 'none' }}>
                         {index + 1}/{group.media.length}
                     </CountBadge>
-                )}
-                {group.media.length > 1 && (
-                    <NavButton className="prev" onClick={handlePrev}>‹</NavButton>
-                )}
-
-                {currentItem.type === 'video' ? (
-                    <video
-                        ref={videoRef}
-                        src={getFullUrl(currentItem.minioUrl)}
-                        controls
-                        loop
-                        playsInline
-                        onError={() => onReportError(currentItem.id)}
-                    />
-                ) : (
-                    <img
-                        src={getFullUrl(currentItem.minioUrl)}
-                        alt="feed"
-                        onError={() => onReportError(currentItem.id)}
-                    />
-                )}
-
-                {currentItem.type === 'video' && currentItem.duration && (
-                    <DurationBadge style={{ bottom: '20px', right: '20px', fontSize: '13px', padding: '4px 8px' }}>
-                        {formatDuration(currentItem.duration)}
-                    </DurationBadge>
-                )}
-
-                {group.media.length > 1 && (
-                    <NavButton className="next" onClick={handleNext}>›</NavButton>
-                )}
-            </FeedContent>
-
+                    <NavButton className="prev" onClick={handlePrev} style={{ zIndex: 10 }}>‹</NavButton>
+                    <NavButton className="next" onClick={handleNext} style={{ zIndex: 10 }}>›</NavButton>
+                </>
+            )}
         </FeedItem>
     );
 };
@@ -723,63 +800,76 @@ export const ThumbnailGrid = () => {
         return `${baseUrl}${finalUrl}`;
     };
 
-    const handleGroupClick = (group: GroupedMedia) => {
-        setSelectedGroup(group);
-        setSelectedIndex(0);
+    const isFeedLoadingRef = useRef(false);
+
+    const { ref: modalScrollRef, onMouseUp: onModalMouseUp, onMouseDown: onModalMouseDown, onMouseMove: onModalMouseMove, onMouseLeave: onModalMouseLeave } = useDraggableScroll();
+    const modalDragProps = { onMouseUp: onModalMouseUp, onMouseDown: onModalMouseDown, onMouseMove: onModalMouseMove, onMouseLeave: onModalMouseLeave };
+
+    // Sync modal index on scroll
+    const handleModalScroll = (e: React.UIEvent<HTMLDivElement>) => {
+        const target = e.currentTarget;
+        if (target.clientWidth === 0) return;
+        const newIndex = Math.round(target.scrollLeft / target.clientWidth);
+        if (newIndex !== selectedIndex && !isZoomed) {
+            setSelectedIndex(newIndex);
+        }
+    };
+
+    const modalScrollTo = (idx: number) => {
+        if (modalScrollRef.current) {
+            modalScrollRef.current.scrollTo({
+                left: idx * modalScrollRef.current.clientWidth,
+                behavior: 'smooth'
+            });
+        }
     };
 
     const handleNext = (e?: React.MouseEvent) => {
         e?.stopPropagation();
         if (!selectedGroup) return;
-        setSelectedIndex(prev => (prev + 1) % selectedGroup.media.length);
+        const next = (selectedIndex + 1) % selectedGroup.media.length;
+        modalScrollTo(next);
+        setIsZoomed(false);
     };
 
     const handlePrev = (e?: React.MouseEvent) => {
         e?.stopPropagation();
         if (!selectedGroup) return;
-        setSelectedIndex(prev => (prev - 1 + selectedGroup.media.length) % selectedGroup.media.length);
+        const prev = (selectedIndex - 1 + selectedGroup.media.length) % selectedGroup.media.length;
+        modalScrollTo(prev);
+        setIsZoomed(false);
     };
 
-    // Touch Handling for Swipe
-    const touchStartX = useRef(0);
-    const touchEndX = useRef(0);
+    // Keyboard Navigation for Feed and Modal
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (!selectedGroup) return;
 
-    const handleTouchStart = (e: React.TouchEvent) => {
-        touchStartX.current = e.targetTouches[0].clientX;
-    };
+            if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                handlePrev();
+            } else if (e.key === 'ArrowRight') {
+                e.preventDefault();
+                handleNext();
+            } else if (e.key === 'Escape') {
+                setSelectedGroup(null);
+            }
+        };
 
-    const handleTouchMove = (e: React.TouchEvent) => {
-        touchEndX.current = e.targetTouches[0].clientX;
-    };
-
-    const handleTouchEnd = () => {
-        if (!touchStartX.current || !touchEndX.current) return;
-        const diff = touchStartX.current - touchEndX.current;
-        const threshold = 50;
-
-        if (diff > threshold) {
-            handleNext();
-        } else if (diff < -threshold) {
-            handlePrev();
-        }
-        touchStartX.current = 0;
-        touchEndX.current = 0;
-    };
-
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [selectedGroup, selectedIndex]);
     // Keyboard Navigation for Feed
     useEffect(() => {
         if (viewMode !== 'feed') return;
-
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === 'ArrowDown') {
                 e.preventDefault();
                 const container = document.querySelector('.feed-container');
                 if (container) {
                     container.scrollBy({ top: window.innerHeight, behavior: 'smooth' });
-
-                    // Pre-load trigger if near bottom
                     const remaining = container.scrollHeight - (container.scrollTop + container.clientHeight);
-                    if (remaining < window.innerHeight * 2) { // Determine if within 2 screens of bottom
+                    if (remaining < window.innerHeight * 2) {
                         loadFeed();
                     }
                 }
@@ -791,30 +881,24 @@ export const ThumbnailGrid = () => {
                 }
             }
         };
-
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [viewMode, loadFeed]);
 
     const handleDelete = async (id: string, group: GroupedMedia) => {
         if (!window.confirm('Are you sure you want to delete this media? This cannot be undone.')) return;
-
         try {
             await api.delete(`/feed/${id}`);
-
-            // Update State
             const updatedMedia = group.media.filter(m => m.id !== id);
-
             if (updatedMedia.length === 0) {
-                // Remove entire group if empty
                 setGroups(prev => prev.filter(g => g.discordMessageId !== group.discordMessageId));
+                setFeedItems(prev => prev.filter(g => g.discordMessageId !== group.discordMessageId));
                 setSelectedGroup(null);
             } else {
-                // Update group
                 const newGroup = { ...group, media: updatedMedia };
                 setGroups(prev => prev.map(g => g.discordMessageId === group.discordMessageId ? newGroup : g));
+                setFeedItems(prev => prev.map(g => g.discordMessageId === group.discordMessageId ? newGroup : g));
                 setSelectedGroup(newGroup);
-                // Adjust index if needed
                 if (selectedIndex >= updatedMedia.length) {
                     setSelectedIndex(Math.max(0, updatedMedia.length - 1));
                 }
@@ -836,44 +920,22 @@ export const ThumbnailGrid = () => {
         }
     };
 
+    const handleGroupClick = (group: GroupedMedia) => {
+        setSelectedGroup(group);
+        setSelectedIndex(0);
+        if (modalScrollRef.current) modalScrollRef.current.scrollLeft = 0;
+    };
+
     return (
         <>
             <Header>
                 <ControlGroup>
-                    <ToggleButton
-                        $active={viewMode === 'list'}
-                        onClick={() => setViewMode('list')}
-                    >
-                        List
-                    </ToggleButton>
-                    <ToggleButton
-                        $active={viewMode === 'feed'}
-                        onClick={() => setViewMode('feed')}
-                    >
-                        Feed
-                    </ToggleButton>
-                    <button style={{ marginLeft: '10px', padding: '5px 10px', background: '#444', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }} onClick={() => {
-                        if (confirm('Start global order repair? This may take a while.')) {
-                            api.post('/feed/repair-indices').then(() => alert('Started!')).catch(e => alert('Failed: ' + e));
-                        }
-                    }}>
-                        Repair Order
-                    </button>
+                    <ToggleButton $active={viewMode === 'list'} onClick={() => setViewMode('list')}>List</ToggleButton>
+                    <ToggleButton $active={viewMode === 'feed'} onClick={() => setViewMode('feed')}>Feed</ToggleButton>
 
                     <Separator />
-
-                    <ToggleButton
-                        $active={showVideos}
-                        onClick={() => setShowVideos(!showVideos)}
-                    >
-                        Videos
-                    </ToggleButton>
-                    <ToggleButton
-                        $active={showImages}
-                        onClick={() => setShowImages(!showImages)}
-                    >
-                        Images
-                    </ToggleButton>
+                    <ToggleButton $active={showVideos} onClick={() => setShowVideos(!showVideos)}>Videos</ToggleButton>
+                    <ToggleButton $active={showImages} onClick={() => setShowImages(!showImages)}>Images</ToggleButton>
                 </ControlGroup>
 
                 {viewMode === 'list' && (
@@ -881,14 +943,9 @@ export const ThumbnailGrid = () => {
                         <ToggleButton
                             $active={sortBy === 'fetch'}
                             onClick={() => {
-                                if (sortBy === 'fetch') {
-                                    setSortOrder(prev => prev === 'DESC' ? 'ASC' : 'DESC');
-                                } else {
-                                    setSortBy('fetch');
-                                    setSortOrder('DESC');
-                                }
-                                setGroups([]);
-                                setHasMore(true);
+                                if (sortBy === 'fetch') setSortOrder(prev => prev === 'DESC' ? 'ASC' : 'DESC');
+                                else { setSortBy('fetch'); setSortOrder('DESC'); }
+                                setGroups([]); setHasMore(true);
                             }}
                         >
                             Sort: Fetch {sortBy === 'fetch' && (sortOrder === 'DESC' ? '↓' : '↑')}
@@ -896,14 +953,9 @@ export const ThumbnailGrid = () => {
                         <ToggleButton
                             $active={sortBy === 'discord'}
                             onClick={() => {
-                                if (sortBy === 'discord') {
-                                    setSortOrder(prev => prev === 'DESC' ? 'ASC' : 'DESC');
-                                } else {
-                                    setSortBy('discord');
-                                    setSortOrder('DESC');
-                                }
-                                setGroups([]);
-                                setHasMore(true);
+                                if (sortBy === 'discord') setSortOrder(prev => prev === 'DESC' ? 'ASC' : 'DESC');
+                                else { setSortBy('discord'); setSortOrder('DESC'); }
+                                setGroups([]); setHasMore(true);
                             }}
                         >
                             Sort: Date {sortBy === 'discord' && (sortOrder === 'DESC' ? '↓' : '↑')}
@@ -915,12 +967,8 @@ export const ThumbnailGrid = () => {
                         <SliderLabel>
                             Size:
                             <RangeInput
-                                type="range"
-                                min="80"
-                                max="500"
-                                step="10"
-                                value={gridSize}
-                                onChange={(e) => setGridSize(Number(e.target.value))}
+                                type="range" min="80" max="500" step="10"
+                                value={gridSize} onChange={(e) => setGridSize(Number(e.target.value))}
                             />
                         </SliderLabel>
                     </ControlGroup>
@@ -937,7 +985,6 @@ export const ThumbnailGrid = () => {
                         else if (count === 4) collageClass = 'collage-4';
                         else if (count >= 5) collageClass = 'collage-multi';
 
-                        // Limit to 9 for 3x3 grid
                         const displayItems = group.media.slice(0, 9);
                         const remainder = count - 9;
 
@@ -950,7 +997,6 @@ export const ThumbnailGrid = () => {
                                 {displayItems.map((item, idx) => {
                                     const isVideo = item.type === 'video';
                                     const showOverlay = idx === 8 && remainder > 0;
-
                                     return (
                                         <div key={item.id} style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }}>
                                             {item.thumbnailUrl ? (
@@ -960,12 +1006,9 @@ export const ThumbnailGrid = () => {
                                             ) : (
                                                 <CollageImage src={getFullUrl(item.minioUrl)} alt="thumb" loading="lazy" />
                                             )}
-
-                                            {/* Duration on first item only if it's the only item, or maybe small badges? */}
                                             {count === 1 && isVideo && item.duration && (
                                                 <DurationBadge>{formatDuration(item.duration)}</DurationBadge>
                                             )}
-
                                             {showOverlay && (
                                                 <div style={{
                                                     position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)',
@@ -978,24 +1021,15 @@ export const ThumbnailGrid = () => {
                                         </div>
                                     );
                                 })}
-
                                 {count === 1 && <TypeBadge>{group.media[0].type}</TypeBadge>}
-                                {count > 1 && <TypeBadge style={{ background: '#444' }}>x{count}</TypeBadge>}
-                                {/* Keep count badge as TypeBadge replacement or addition? User asks for split view. */}
+                                {count > 1 && <CountBadge>{count}</CountBadge>}
                             </Thumbnail>
                         );
                     })}
-
                     {hasMore && (
                         <Loading ref={ref} onClick={() => loadList()}>
                             {errorInfo ? <span style={{ color: '#ff4444' }}>{errorInfo}</span> : (loading ? 'Loading...' : 'Tap for more')}
                         </Loading>
-                    )}
-
-                    {!loading && !errorInfo && groups.length === 0 && (
-                        <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '100px', color: '#8b949e' }}>
-                            No results found.
-                        </div>
                     )}
                 </GridContainer>
             ) : (
@@ -1010,69 +1044,65 @@ export const ThumbnailGrid = () => {
                     ))}
                     <div ref={feedRef} style={{ height: '100px', width: '100%' }}></div>
                     {feedLoading && <div style={{ color: '#8b949e', textAlign: 'center', padding: '20px' }}>Loading more...</div>}
-                    {errorInfo && <div style={{ color: '#ff4444', textAlign: 'center', padding: '20px' }}>{errorInfo}</div>}
                 </FeedContainer>
             )}
 
-            {selectedGroup && viewMode === 'list' && (
+            {selectedGroup && (
                 <Overlay onClick={() => setSelectedGroup(null)}>
                     <CloseButton onClick={(e) => { e.stopPropagation(); setSelectedGroup(null); }}>×</CloseButton>
-
-                    <ModalContainer
-                        onTouchStart={handleTouchStart}
-                        onTouchMove={handleTouchMove}
-                        onTouchEnd={handleTouchEnd}
-                    >
+                    <ModalContainer onClick={e => e.stopPropagation()}>
                         {selectedGroup.media.length > 1 && (
                             <NavButton className="prev" onClick={handlePrev}>‹</NavButton>
                         )}
-
                         <ModalContentWrapper>
-                            <MediaContent
-                                onClick={e => e.stopPropagation()}
-                                style={{ overflow: isZoomed ? 'auto' : 'hidden', display: 'block' }} // Allow scroll when zoomed
+                            <HorizontalScroll
+                                ref={modalScrollRef}
+                                onScroll={handleModalScroll}
+                                {...modalDragProps}
                             >
-                                {(() => {
-                                    const item = selectedGroup.media[selectedIndex];
-                                    return item.type === 'video' ? (
-                                        <video
-                                            key={item.id}
-                                            src={getFullUrl(item.minioUrl)}
-                                            controls
-                                            autoPlay
-                                            loop
-                                            playsInline
-                                            ref={el => { if (el) el.volume = 0.5; }}
-                                            style={{ margin: 'auto', display: 'block', maxHeight: '80vh', maxWidth: '100%' }}
-                                        />
-                                    ) : (
-                                        <img
-                                            src={getFullUrl(item.minioUrl)}
-                                            alt="full"
-                                            onClick={(e) => { e.stopPropagation(); setIsZoomed(!isZoomed); }}
+                                {selectedGroup.media.map((item, idx) => (
+                                    <HorizontalItem key={item.id}>
+                                        <MediaContent
+                                            onClick={e => e.stopPropagation()}
                                             style={{
-                                                cursor: isZoomed ? 'zoom-out' : 'zoom-in',
-                                                maxHeight: isZoomed ? 'none' : '80vh',
-                                                maxWidth: isZoomed ? 'none' : '100%',
-                                                width: isZoomed ? 'auto' : '100%', // Use auto width when zoomed to show true size
-                                                display: 'block',
-                                                margin: 'auto'
+                                                overflow: isZoomed && selectedIndex === idx ? 'auto' : 'hidden',
+                                                display: 'block'
                                             }}
-                                        />
-                                    );
-                                })()}
-                            </MediaContent>
+                                        >
+                                            {item.type === 'video' ? (
+                                                <video
+                                                    key={item.id}
+                                                    src={getFullUrl(item.minioUrl)}
+                                                    controls autoPlay loop playsInline
+                                                    ref={el => { if (el && idx === selectedIndex) el.volume = 0.5; }}
+                                                    style={{ margin: 'auto', display: 'block', maxHeight: '80vh', maxWidth: '100%' }}
+                                                />
+                                            ) : (
+                                                <img
+                                                    src={getFullUrl(item.minioUrl)}
+                                                    alt="full"
+                                                    onClick={(e) => { e.stopPropagation(); setIsZoomed(!isZoomed); }}
+                                                    style={{
+                                                        cursor: isZoomed ? 'zoom-out' : 'zoom-in',
+                                                        maxHeight: isZoomed ? 'none' : '80vh',
+                                                        maxWidth: isZoomed ? 'none' : '100%',
+                                                        width: isZoomed ? 'auto' : '100%',
+                                                        display: 'block', margin: 'auto'
+                                                    }}
+                                                />
+                                            )}
+                                        </MediaContent>
+                                    </HorizontalItem>
+                                ))}
+                            </HorizontalScroll>
                         </ModalContentWrapper>
-
                         {selectedGroup.media.length > 1 && (
                             <NavButton className="next" onClick={handleNext}>›</NavButton>
                         )}
-
                         <InfoPanel onClick={e => e.stopPropagation()}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                 <div style={{ flex: 1, marginRight: '16px' }}>
                                     <small style={{ color: '#8b949e', display: 'block', marginBottom: '8px' }}>
-                                        {/* Use discordCreatedAt if available, else createdAt */}
                                         {new Date(selectedGroup.discordCreatedAt || selectedGroup.createdAt).toLocaleString()} • {selectedIndex + 1}/{selectedGroup.media.length}
                                     </small>
                                     <MessageText>{selectedGroup.content || '(No Text Content)'}</MessageText>
@@ -1080,41 +1110,14 @@ export const ThumbnailGrid = () => {
                                 <div style={{ display: 'flex', gap: '8px', flexDirection: 'column' }}>
                                     <ButtonLink
                                         href={`https://discord.com/channels/@me/${selectedGroup.originalChannel}/${selectedGroup.discordMessageId}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                    >
-                                        Discord
-                                    </ButtonLink>
-                                    <button
-                                        style={{
-                                            background: '#2ba44e',
-                                            border: 'none',
-                                            color: 'white',
-                                            padding: '6px 12px',
-                                            borderRadius: '6px',
-                                            cursor: 'pointer',
-                                            fontSize: '12px',
-                                            fontWeight: 'bold'
-                                        }}
+                                        target="_blank" rel="noopener noreferrer"
+                                    >Discord</ButtonLink>
+                                    <button style={{ background: '#2ba44e', border: 'none', color: 'white', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
                                         onClick={() => handleRedownload(selectedGroup.media[selectedIndex].id)}
-                                    >
-                                        Re-download
-                                    </button>
-                                    <button
-                                        style={{
-                                            background: '#da3633',
-                                            border: 'none',
-                                            color: 'white',
-                                            padding: '6px 12px',
-                                            borderRadius: '6px',
-                                            cursor: 'pointer',
-                                            fontSize: '12px',
-                                            fontWeight: 'bold'
-                                        }}
+                                    >Re-download</button>
+                                    <button style={{ background: '#da3633', border: 'none', color: 'white', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
                                         onClick={() => handleDelete(selectedGroup.media[selectedIndex].id, selectedGroup)}
-                                    >
-                                        Delete
-                                    </button>
+                                    >Delete</button>
                                 </div>
                             </div>
                         </InfoPanel>
