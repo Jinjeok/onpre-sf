@@ -2,17 +2,8 @@ import styled from 'styled-components';
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useInView } from 'react-intersection-observer';
 import api from '../api';
-import axios from 'axios';
 
-const PageContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  /* Use dynamic viewport height for mobile browsers if supported */
-  height: 100dvh;
-  overflow: hidden;
-  background-color: #0d1117;
-`;
+import axios from 'axios';
 
 const GridContainer = styled.div`
   display: grid;
@@ -20,75 +11,14 @@ const GridContainer = styled.div`
   grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
   gap: 8px;
   padding: 8px;
-  flex: 1;
-  overflow-y: auto;
-  min-height: 0;
+  background-color: #0d1117;
+  min-height: 100vh;
 
   // PC: larger thumbs
   @media (min-width: 768px) {
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: 16px;
     padding: 16px;
-  }
-`;
-
-const FeedContainer = styled.div`
-  width: 100%;
-  flex: 1;
-  overflow-y: scroll;
-  scroll-snap-type: y mandatory;
-  background: #000;
-  position: relative;
-  min-height: 0;
-
-  /* Hide scrollbar */
-  &::-webkit-scrollbar { display: none; }
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-`;
-
-const FeedItem = styled.div`
-  width: 100%;
-  height: 100%;
-  scroll-snap-align: start;
-  position: relative;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background: #000;
-`;
-
-const FeedContent = styled.div`
-    width: 100%;
-    height: 100%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    position: relative;
-
-    img, video {
-        max-width: 100%;
-        max-height: 100%;
-        width: 100%;
-        height: 100%;
-        object-fit: contain;
-    }
-`;
-
-const Header = styled.header`
-  padding: 12px 16px;
-  background: #161b22;
-  border-bottom: 1px solid #30363d;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  z-index: 100;
-  flex-shrink: 0;
-
-  @media (min-width: 768px) {
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
   }
 `;
 
@@ -181,6 +111,20 @@ const DurationBadge = styled.div`
   box-shadow: 0 1px 2px rgba(0,0,0,0.3);
 `;
 
+const formatDuration = (seconds?: number) => {
+    if (!seconds) return '';
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = Math.floor(seconds % 60);
+
+    const parts = [];
+    if (h > 0) parts.push(h);
+    parts.push(h > 0 ? String(m).padStart(2, '0') : m);
+    parts.push(String(s).padStart(2, '0'));
+
+    return parts.join(':');
+};
+
 const Loading = styled.div`
   grid-column: 1 / -1;
   text-align: center;
@@ -223,10 +167,11 @@ const ModalContentWrapper = styled.div`
   justify-content: center;
   align-items: center;
   width: 100%;
-  max-height: 85vh;
+  max-height: 85vh; /* Reserve space for info panel */
   position: relative;
 `;
 
+// Only this element stops propagation (the actual content)
 const MediaContent = styled.div`
   max-width: 100%;
   max-height: 100%;
@@ -250,6 +195,7 @@ const InfoPanel = styled.div`
   width: 100%;
   color: #c9d1d9;
   z-index: 1002;
+  /* Make panel sit at bottom properly */
   min-height: 15vh;
   display: flex;
   flex-direction: column;
@@ -330,86 +276,50 @@ const CloseButton = styled.button`
   }
 `;
 
-const ControlGroup = styled.div`
+const FeedContainer = styled.div`
+  width: 100%;
+  height: calc(100vh - 65px); // Header height approx
+  overflow-y: scroll;
+  scroll-snap-type: y mandatory;
+  background: #000;
+  position: relative;
+
+  /* Hide scrollbar */
+  &::-webkit-scrollbar { display: none; }
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+`;
+
+const FeedItem = styled.div`
+  width: 100%;
+  height: 100%;
+  scroll-snap-align: start;
+  position: relative;
   display: flex;
+  justify-content: center;
   align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
+  background: #000;
 `;
 
-const ToggleButton = styled.button<{ $active?: boolean; $disabled?: boolean }>`
-  background: ${props => props.$active ? '#238636' : '#21262d'};
-  color: ${props => props.$active ? 'white' : '#c9d1d9'};
-  border: 1px solid ${props => props.$active ? '#2ea043' : '#30363d'};
-  padding: 6px 16px;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: ${props => props.$disabled ? 'not-allowed' : 'pointer'};
-  opacity: ${props => props.$disabled ? 0.5 : 1};
-  transition: all 0.2s;
+const FeedContent = styled.div`
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
 
-  &:hover {
-    background: ${props => props.$disabled ? '#21262d' : (props.$active ? '#2ea043' : '#30363d')};
-  }
+    img, video {
+        max-width: 100%;
+        max-height: 100%;
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+    }
 `;
 
-const Separator = styled.div`
-  width: 1px;
-  height: 20px;
-  background: #30363d;
-  margin: 0 4px;
-`;
 
-const SliderLabel = styled.label`
-  color: #c9d1d9;
-  font-size: 13px;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-`;
-
-const RangeInput = styled.input`
-  cursor: pointer;
-  accent-color: #238636;
-`;
-
-const formatDuration = (seconds?: number) => {
-    if (!seconds) return '';
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = Math.floor(seconds % 60);
-
-    const parts = [];
-    if (h > 0) parts.push(h);
-    parts.push(h > 0 ? String(m).padStart(2, '0') : m);
-    parts.push(String(s).padStart(2, '0'));
-
-    return parts.join(':');
-};
-
-interface MediaItem {
-    id: string;
-    type: string;
-    minioUrl: string;
-    thumbnailUrl?: string;
-    duration?: number;
-    originalChannel: string;
-    discordMessageId: string;
-    content?: string;
-    discordCreatedAt?: string;
-}
-
-interface GroupedMedia {
-    discordMessageId: string;
-    originalChannel: string;
-    content: string;
-    createdAt: string;
-    discordCreatedAt?: string;
-    media: MediaItem[];
-}
-
+// Helper component for individual feed card
 const FeedCard = ({ group, getFullUrl, onReportError }: { group: GroupedMedia, getFullUrl: (u: string) => string, onReportError: (id: string) => void }) => {
     const [index, setIndex] = useState(0);
     const videoRef = useRef<HTMLVideoElement>(null);
@@ -421,10 +331,12 @@ const FeedCard = ({ group, getFullUrl, onReportError }: { group: GroupedMedia, g
         if (videoRef.current) {
             videoRef.current.volume = 0.5;
             if (inView) {
-                videoRef.current.play().catch(() => { });
+                videoRef.current.play().catch(() => {
+                    // Autoplay might be blocked if no user interaction yet
+                });
             } else {
                 videoRef.current.pause();
-                videoRef.current.currentTime = 0;
+                videoRef.current.currentTime = 0; // Optional: Reset to start when out of view
             }
         }
     }, [inView, index]);
@@ -439,6 +351,7 @@ const FeedCard = ({ group, getFullUrl, onReportError }: { group: GroupedMedia, g
         setIndex((prev) => (prev - 1 + group.media.length) % group.media.length);
     };
 
+    // Keyboard Navigation (Horizontal)
     useEffect(() => {
         if (!inView) return;
 
@@ -497,9 +410,95 @@ const FeedCard = ({ group, getFullUrl, onReportError }: { group: GroupedMedia, g
                     <NavButton className="next" onClick={handleNext}>›</NavButton>
                 )}
             </FeedContent>
+
         </FeedItem>
     );
 };
+
+// Controls Bar
+const Header = styled.header`
+  padding: 12px 16px;
+  background: #161b22;
+  border-bottom: 1px solid #30363d;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+
+  @media (min-width: 768px) {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+`;
+
+const ControlGroup = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+`;
+
+const ToggleButton = styled.button<{ $active?: boolean; $disabled?: boolean }>`
+  background: ${props => props.$active ? '#238636' : '#21262d'};
+  color: ${props => props.$active ? 'white' : '#c9d1d9'};
+  border: 1px solid ${props => props.$active ? '#2ea043' : '#30363d'};
+  padding: 6px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: ${props => props.$disabled ? 'not-allowed' : 'pointer'};
+  opacity: ${props => props.$disabled ? 0.5 : 1};
+  transition: all 0.2s;
+
+  &:hover {
+    background: ${props => props.$disabled ? '#21262d' : (props.$active ? '#2ea043' : '#30363d')};
+  }
+`;
+
+const Separator = styled.div`
+  width: 1px;
+  height: 20px;
+  background: #30363d;
+  margin: 0 4px;
+`;
+
+const SliderLabel = styled.label`
+  color: #c9d1d9;
+  font-size: 13px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+`;
+
+const RangeInput = styled.input`
+  cursor: pointer;
+  accent-color: #238636;
+`;
+
+interface MediaItem {
+    id: string;
+    type: string;
+    minioUrl: string;
+    thumbnailUrl?: string;
+    duration?: number;
+    originalChannel: string;
+    discordMessageId: string;
+    content?: string;
+    discordCreatedAt?: string;
+}
+
+interface GroupedMedia {
+    discordMessageId: string;
+    originalChannel: string;
+    content: string;
+    createdAt: string;
+    discordCreatedAt?: string;
+    media: MediaItem[];
+}
 
 export const ThumbnailGrid = () => {
     const [groups, setGroups] = useState<GroupedMedia[]>([]);
@@ -507,27 +506,31 @@ export const ThumbnailGrid = () => {
     const [hasMore, setHasMore] = useState(true);
     const [selectedGroup, setSelectedGroup] = useState<GroupedMedia | null>(null);
     const [selectedIndex, setSelectedIndex] = useState(0);
-    const [gridSize, setGridSize] = useState(200);
+    const [gridSize, setGridSize] = useState(200); // Default px size
     const [sortBy, setSortBy] = useState<'fetch' | 'discord'>('fetch');
     const [errorInfo, setErrorInfo] = useState<string | null>(null);
 
+    // Header States
     const [showVideos, setShowVideos] = useState(true);
     const [showImages, setShowImages] = useState(true);
     const [viewMode, setViewMode] = useState<'list' | 'feed'>('list');
 
+    // Feed Mode States
     const [feedItems, setFeedItems] = useState<GroupedMedia[]>([]);
     const [feedLoading, setFeedLoading] = useState(false);
     const excludeIdsRef = useRef<string[]>([]);
 
+    // List Observer
     const [ref, inView] = useInView({
         threshold: 0.1,
-        rootMargin: '400px',
+        rootMargin: '400px', // Load earlier
         triggerOnce: false,
     });
 
+    // Feed Observer
     const [feedRef, feedInView] = useInView({
         threshold: 0.1,
-        rootMargin: '800px',
+        rootMargin: '800px', // Preload aggressive
         triggerOnce: false
     });
 
@@ -535,6 +538,16 @@ export const ThumbnailGrid = () => {
 
     const loadFeed = useCallback(async () => {
         if (loadingRef.current) return;
+        // setFeedLoading(true); // Rely on ref to prevent double-fetch strictness
+        // Actually feedLoading state is used for UI spinner, but let's use a ref for logic safety if needed.
+        // Re-using feedLoading state is fine if we check it.
+
+        // We need to access the LATEST state in this callback? 
+        // loadFeed closure will be refreshed if we put dependencies in useCallback.
+
+        // Let's rely on refs for exclusion logic which is already there.
+        // showVideos/showImages are state.
+
         loadingRef.current = true;
         setFeedLoading(true);
 
@@ -547,6 +560,7 @@ export const ThumbnailGrid = () => {
                 return;
             }
 
+            // Exclude last 20 loaded IDs to avoid frequent repeats
             const excludes = excludeIdsRef.current.slice(-20).join(',');
 
             const response = await api.get('/feed/random', {
@@ -568,6 +582,8 @@ export const ThumbnailGrid = () => {
             if (!axios.isCancel(err)) {
                 if (err.response?.status === 502 || err.code === 'ERR_NETWORK') {
                     setErrorInfo('Backend Unavailable (502). Retrying stopped.');
+                    // Stop further random fetches? Maybe just show error.
+                    // For feed, we might want to let user retry manually?
                 }
             }
         } finally {
@@ -576,6 +592,7 @@ export const ThumbnailGrid = () => {
         }
     }, [showVideos, showImages]);
 
+    // Initial load and mode/filter change
     useEffect(() => {
         setGroups([]);
         setFeedItems([]);
@@ -589,7 +606,7 @@ export const ThumbnailGrid = () => {
         } else {
             loadFeed();
         }
-    }, [viewMode, loadFeed, sortBy]);
+    }, [viewMode, loadFeed, sortBy]); // Added sortBy
 
     useEffect(() => {
         if (viewMode === 'list' && inView && hasMore && !loading) {
@@ -609,6 +626,7 @@ export const ThumbnailGrid = () => {
             const currentOffset = isReset ? 0 : groups.length;
             const limit = 20;
 
+            // Determine type filter
             let typeParam: string | undefined = undefined;
             if (showVideos && !showImages) typeParam = 'video';
             if (!showVideos && showImages) typeParam = 'image';
@@ -646,7 +664,7 @@ export const ThumbnailGrid = () => {
             if (!axios.isCancel(err)) {
                 if (err.response?.status === 502 || err.code === 'ERR_NETWORK') {
                     setErrorInfo('Failed to connect to backend (502 / Network Error).');
-                    setHasMore(false);
+                    setHasMore(false); // Stop infinite scroll
                 }
             }
         } finally {
@@ -685,6 +703,7 @@ export const ThumbnailGrid = () => {
                 finalUrl = `/feed/media?key=${encodeURIComponent(key)}${tokenSuffix}`;
             }
         } else if (finalUrl.includes('/feed/media?key=')) {
+            // Already converted but might need token
             if (!finalUrl.includes('&token=')) {
                 finalUrl += tokenSuffix;
             }
@@ -712,6 +731,7 @@ export const ThumbnailGrid = () => {
         setSelectedIndex(prev => (prev - 1 + selectedGroup.media.length) % selectedGroup.media.length);
     };
 
+    // Touch Handling for Swipe
     const touchStartX = useRef(0);
     const touchEndX = useRef(0);
 
@@ -725,76 +745,90 @@ export const ThumbnailGrid = () => {
 
     const handleTouchEnd = () => {
         if (!touchStartX.current || !touchEndX.current) return;
-        const distance = touchStartX.current - touchEndX.current;
-        const isLeftSwipe = distance > 50;
-        const isRightSwipe = distance < -50;
+        const diff = touchStartX.current - touchEndX.current;
+        const threshold = 50;
 
-        if (isLeftSwipe) {
+        if (diff > threshold) {
             handleNext();
-        } else if (isRightSwipe) {
+        } else if (diff < -threshold) {
             handlePrev();
         }
-
         touchStartX.current = 0;
         touchEndX.current = 0;
     };
 
-    const handleRedownload = async (mediaId: string) => {
-        if (!confirm('Re-download this item?')) return;
+    // Keyboard Navigation for Feed
+    useEffect(() => {
+        if (viewMode !== 'feed') return;
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                const container = document.querySelector('.feed-container');
+                if (container) {
+                    container.scrollBy({ top: window.innerHeight, behavior: 'smooth' });
+
+                    // Pre-load trigger if near bottom
+                    const remaining = container.scrollHeight - (container.scrollTop + container.clientHeight);
+                    if (remaining < window.innerHeight * 2) { // Determine if within 2 screens of bottom
+                        loadFeed();
+                    }
+                }
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                const container = document.querySelector('.feed-container');
+                if (container) {
+                    container.scrollBy({ top: -window.innerHeight, behavior: 'smooth' });
+                }
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [viewMode, loadFeed]);
+
+    const handleDelete = async (id: string, group: GroupedMedia) => {
+        if (!window.confirm('Are you sure you want to delete this media? This cannot be undone.')) return;
+
         try {
-            await api.post(`/feed/${mediaId}/redownload`);
-            alert('Re-download started. It may take a moment.');
-        } catch (e) {
-            alert('Failed to start re-download.');
-            console.error(e);
+            await api.delete(`/feed/${id}`);
+
+            // Update State
+            const updatedMedia = group.media.filter(m => m.id !== id);
+
+            if (updatedMedia.length === 0) {
+                // Remove entire group if empty
+                setGroups(prev => prev.filter(g => g.discordMessageId !== group.discordMessageId));
+                setSelectedGroup(null);
+            } else {
+                // Update group
+                const newGroup = { ...group, media: updatedMedia };
+                setGroups(prev => prev.map(g => g.discordMessageId === group.discordMessageId ? newGroup : g));
+                setSelectedGroup(newGroup);
+                // Adjust index if needed
+                if (selectedIndex >= updatedMedia.length) {
+                    setSelectedIndex(Math.max(0, updatedMedia.length - 1));
+                }
+            }
+        } catch (err) {
+            console.error('Failed to delete media:', err);
+            alert('Failed to delete media.');
         }
     };
 
-    const handleDelete = async (mediaId: string, group: GroupedMedia) => {
-        if (!confirm('Delete this item?')) return;
+    const handleRedownload = async (id: string) => {
+        if (!confirm('Re-download this media? This will delete the current file and fetch it again from Discord.')) return;
         try {
-            await api.delete(`/feed/${mediaId}`);
-
-            // Remove from local state
-            if (viewMode === 'list') {
-                setGroups(prev => {
-                    return prev.map(g => {
-                        if (g.discordMessageId === group.discordMessageId) {
-                            return { ...g, media: g.media.filter(m => m.id !== mediaId) };
-                        }
-                        return g;
-                    }).filter(g => g.media.length > 0);
-                });
-            } else {
-                setFeedItems(prev => {
-                    return prev.map(g => {
-                        if (g.discordMessageId === group.discordMessageId) {
-                            return { ...g, media: g.media.filter(m => m.id !== mediaId) };
-                        }
-                        return g;
-                    }).filter(g => g.media.length > 0);
-                });
-            }
-
-            // If modal open, close or update
-            if (selectedGroup && selectedGroup.discordMessageId === group.discordMessageId) {
-                const newMedia = selectedGroup.media.filter(m => m.id !== mediaId);
-                if (newMedia.length === 0) {
-                    setSelectedGroup(null);
-                } else {
-                    setSelectedGroup({ ...selectedGroup, media: newMedia });
-                    setSelectedIndex(0);
-                }
-            }
-
-        } catch (e) {
-            alert('Failed to delete item.');
-            console.error(e);
+            await api.post(`/feed/${id}/redownload`);
+            alert('Redownload started! Please refresh in a moment.');
+        } catch (err) {
+            console.error('Failed to redownload:', err);
+            alert('Failed to redownload.');
         }
     };
 
     return (
-        <PageContainer>
+        <>
             <Header>
                 <ControlGroup>
                     <ToggleButton
@@ -893,6 +927,7 @@ export const ThumbnailGrid = () => {
                                                 <CollageImage src={getFullUrl(item.minioUrl)} alt="thumb" loading="lazy" />
                                             )}
 
+                                            {/* Duration on first item only if it's the only item, or maybe small badges? */}
                                             {count === 1 && isVideo && item.duration && (
                                                 <DurationBadge>{formatDuration(item.duration)}</DurationBadge>
                                             )}
@@ -912,6 +947,7 @@ export const ThumbnailGrid = () => {
 
                                 {count === 1 && <TypeBadge>{group.media[0].type}</TypeBadge>}
                                 {count > 1 && <TypeBadge style={{ background: '#444' }}>x{count}</TypeBadge>}
+                                {/* Keep count badge as TypeBadge replacement or addition? User asks for split view. */}
                             </Thumbnail>
                         );
                     })}
@@ -986,6 +1022,7 @@ export const ThumbnailGrid = () => {
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                 <div style={{ flex: 1, marginRight: '16px' }}>
                                     <small style={{ color: '#8b949e', display: 'block', marginBottom: '8px' }}>
+                                        {/* Use discordCreatedAt if available, else createdAt */}
                                         {new Date(selectedGroup.discordCreatedAt || selectedGroup.createdAt).toLocaleString()} • {selectedIndex + 1}/{selectedGroup.media.length}
                                     </small>
                                     <MessageText>{selectedGroup.content || '(No Text Content)'}</MessageText>
@@ -999,14 +1036,32 @@ export const ThumbnailGrid = () => {
                                         Discord
                                     </ButtonLink>
                                     <button
+                                        style={{
+                                            background: '#2ba44e',
+                                            border: 'none',
+                                            color: 'white',
+                                            padding: '6px 12px',
+                                            borderRadius: '6px',
+                                            cursor: 'pointer',
+                                            fontSize: '12px',
+                                            fontWeight: 'bold'
+                                        }}
                                         onClick={() => handleRedownload(selectedGroup.media[selectedIndex].id)}
-                                        style={{ background: '#238636', border: 'none', borderRadius: '6px', color: 'white', padding: '6px 12px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}
                                     >
                                         Re-download
                                     </button>
                                     <button
+                                        style={{
+                                            background: '#da3633',
+                                            border: 'none',
+                                            color: 'white',
+                                            padding: '6px 12px',
+                                            borderRadius: '6px',
+                                            cursor: 'pointer',
+                                            fontSize: '12px',
+                                            fontWeight: 'bold'
+                                        }}
                                         onClick={() => handleDelete(selectedGroup.media[selectedIndex].id, selectedGroup)}
-                                        style={{ background: '#da3633', border: 'none', borderRadius: '6px', color: 'white', padding: '6px 12px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer' }}
                                     >
                                         Delete
                                     </button>
@@ -1016,6 +1071,6 @@ export const ThumbnailGrid = () => {
                     </ModalContainer>
                 </Overlay>
             )}
-        </PageContainer>
+        </>
     );
 };
