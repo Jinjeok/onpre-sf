@@ -219,8 +219,9 @@ export class DiscordService implements OnModuleInit {
             if (!response.body) throw new Error('Response body is null');
             const nodeStream = this.convertWebStreamToNodeStream(response.body as unknown as ReadableStream<any>);
             await new Promise((resolve, reject) => {
+                fileStream.on('finish', resolve);
+                fileStream.on('error', reject);
                 nodeStream.pipe(fileStream);
-                nodeStream.on('end', resolve);
                 nodeStream.on('error', reject);
             });
 
@@ -273,7 +274,7 @@ export class DiscordService implements OnModuleInit {
 
                 if (type === 'image') {
                     // Generate Image Thumbnail (Resize)
-                    thumbBuffer = await sharp(fileBuffer)
+                    thumbBuffer = await sharp(fileBuffer, { failOnError: false })
                         .resize(300, 300, { fit: 'inside', withoutEnlargement: true })
                         .jpeg({ quality: 80 })
                         .toBuffer();

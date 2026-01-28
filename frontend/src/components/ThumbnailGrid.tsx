@@ -343,12 +343,18 @@ const FeedCard = ({ group, getFullUrl, onReportError }: { group: GroupedMedia, g
 
     const handleNext = (e: React.MouseEvent) => {
         e.stopPropagation();
-        setIndex((prev) => (prev + 1) % group.media.length);
+        if (selectedGroup) {
+            setSelectedIndex((prev) => (prev + 1) % selectedGroup.media.length);
+            setIsZoomed(false);
+        }
     };
 
     const handlePrev = (e: React.MouseEvent) => {
         e.stopPropagation();
-        setIndex((prev) => (prev - 1 + group.media.length) % group.media.length);
+        if (selectedGroup) {
+            setSelectedIndex((prev) => (prev - 1 + selectedGroup.media.length) % selectedGroup.media.length);
+            setIsZoomed(false);
+        }
     };
 
     // Keyboard Navigation (Horizontal)
@@ -510,6 +516,7 @@ export const ThumbnailGrid = () => {
     const [sortBy, setSortBy] = useState<'fetch' | 'discord'>('fetch');
     const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
     const [errorInfo, setErrorInfo] = useState<string | null>(null);
+    const [isZoomed, setIsZoomed] = useState(false); // Zoom state for detail view
 
     // Header States
     const [showVideos, setShowVideos] = useState(true);
@@ -1014,7 +1021,10 @@ export const ThumbnailGrid = () => {
                         )}
 
                         <ModalContentWrapper>
-                            <MediaContent onClick={e => e.stopPropagation()}>
+                            <MediaContent
+                                onClick={e => e.stopPropagation()}
+                                style={{ overflow: isZoomed ? 'auto' : 'hidden', display: 'block' }} // Allow scroll when zoomed
+                            >
                                 {(() => {
                                     const item = selectedGroup.media[selectedIndex];
                                     return item.type === 'video' ? (
@@ -1026,9 +1036,22 @@ export const ThumbnailGrid = () => {
                                             loop
                                             playsInline
                                             ref={el => { if (el) el.volume = 0.5; }}
+                                            style={{ margin: 'auto', display: 'block', maxHeight: '80vh', maxWidth: '100%' }}
                                         />
                                     ) : (
-                                        <img src={getFullUrl(item.minioUrl)} alt="full" />
+                                        <img
+                                            src={getFullUrl(item.minioUrl)}
+                                            alt="full"
+                                            onClick={(e) => { e.stopPropagation(); setIsZoomed(!isZoomed); }}
+                                            style={{
+                                                cursor: isZoomed ? 'zoom-out' : 'zoom-in',
+                                                maxHeight: isZoomed ? 'none' : '80vh',
+                                                maxWidth: isZoomed ? 'none' : '100%',
+                                                width: isZoomed ? 'auto' : '100%', // Use auto width when zoomed to show true size
+                                                display: 'block',
+                                                margin: 'auto'
+                                            }}
+                                        />
                                     );
                                 })()}
                             </MediaContent>
