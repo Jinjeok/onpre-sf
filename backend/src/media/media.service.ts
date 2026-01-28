@@ -201,6 +201,25 @@ export class MediaService {
 
     return this.mediaRepository.delete(id);
   }
+  async findUnindexedGroups(): Promise<any[]> {
+    return this.mediaRepository
+      .createQueryBuilder('media')
+      .select('media.discordMessageId')
+      .addSelect('COUNT(id)', 'count')
+      .where('media.mediaIndex = 0')
+      .groupBy('media.discordMessageId')
+      .having('COUNT(id) > 1')
+      .getRawMany();
+  }
+
+  async findMediaByMessageId(discordMessageId: string): Promise<Media[]> {
+    return this.mediaRepository.find({ where: { discordMessageId } });
+  }
+
+  async updateMediaIndex(id: string, index: number): Promise<void> {
+    await this.mediaRepository.update(id, { mediaIndex: index });
+  }
+
   async isUrlFailed(url: string): Promise<boolean> {
     const failed = await this.failedUrlRepository.findOne({ where: { url } });
     return !!failed && failed.attempts >= 3;

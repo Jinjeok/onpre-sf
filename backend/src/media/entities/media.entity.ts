@@ -35,6 +35,9 @@ export class Media {
     @Column({ nullable: true, type: 'float' })
     duration: number;
 
+    @Column({ default: 0 })
+    mediaIndex: number;
+
     @CreateDateColumn()
     createdAt: Date;
 }

@@ -412,4 +412,64 @@ export class DiscordService implements OnModuleInit {
             throw error;
         }
     }
+
+    async repairIndices() {
+        this.logger.log('Starting index repair...');
+        // 1. Get all message IDs with multiple media items where index is still 0
+        const groups = await this.mediaService.findUnindexedGroups();
+
+        this.logger.log(`Found ${groups.length} groups potentially needing index repair.`);
+
+        for (const group of groups) {
+            const messageId = group.media_discordMessageId;
+            const mediaItems = await this.mediaService.findMediaByMessageId(messageId);
+
+            try {
+                const channelId = mediaItems[0].originalChannel;
+                const channel = await this.client.channels.fetch(channelId) as TextChannel;
+                if (!channel) continue;
+
+                const message = await channel.messages.fetch(messageId);
+                if (!message) continue;
+
+                let attachIdx = 0;
+                let embedIdx = 0;
+
+                // Create a map of calculated indices
+                const calculatedIndices = new Map<string, number>();
+
+                if (message.attachments.size > 0) {
+                    for (const [, attachment] of message.attachments) {
+                        calculatedIndices.set(attachment.url, attachIdx++);
+                    }
+                }
+                if (message.embeds.length > 0) {
+                    for (const embed of message.embeds) {
+                        if (embed.video?.url) calculatedIndices.set(embed.video.url, embedIdx++);
+                        else if (embed.image?.url) calculatedIndices.set(embed.image.url, embedIdx++);
+                        else if (embed.thumbnail?.url) calculatedIndices.set(embed.thumbnail.url, embedIdx++);
+                    }
+                }
+
+                for (const item of mediaItems) {
+                    let matchedIndex = -1;
+                    for (const [url, idx] of calculatedIndices) {
+                        const uniqueId = crypto.createHash('md5').update(url).digest('hex').substring(0, 8);
+                        if (item.minioUrl.includes(`_${uniqueId}_`)) {
+                            matchedIndex = idx;
+                            break;
+                        }
+                    }
+
+                    if (matchedIndex !== -1) {
+                        await this.mediaService.updateMediaIndex(item.id, matchedIndex);
+                    }
+                }
+                this.logger.log(`Repaired indices for message ${messageId}`);
+            } catch (e) {
+                this.logger.warn(`Failed to repair message ${messageId}: ${e.message}`);
+            }
+        }
+        this.logger.log('Index repair completed.');
+    }
 }

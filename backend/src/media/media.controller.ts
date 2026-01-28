@@ -115,4 +115,13 @@ export class MediaController {
   async deleteMedia(@Param('id') id: string) {
     return this.mediaService.deleteMedia(id);
   }
+
+  @Post('repair-indices')
+  @UseGuards(JwtAuthGuard)
+  async repairIndices() {
+    this.discordService.repairIndices().catch(err => {
+      console.error('[MediaController] Error in background repair:', err);
+    });
+    return { status: 'Repair process started in background' };
+  }
 }
