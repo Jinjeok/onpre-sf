@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Media } from './entities/media.entity';
 import { MinioService } from '../minio/minio.service';
+import { FailedUrl } from './entities/failed-url.entity';
 
 @Injectable()
 export class MediaService {
@@ -10,6 +11,8 @@ export class MediaService {
     @InjectRepository(Media)
     private mediaRepository: Repository<Media>,
     private minioService: MinioService,
+    @InjectRepository(FailedUrl)
+    private failedUrlRepository: Repository<FailedUrl>,
   ) { }
 
   async create(media: Partial<Media>) {
@@ -195,5 +198,25 @@ export class MediaService {
     }
 
     return this.mediaRepository.delete(id);
+  }
+  async isUrlFailed(url: string): Promise<boolean> {
+    const failed = await this.failedUrlRepository.findOne({ where: { url } });
+    return !!failed && failed.attempts >= 3;
+  }
+
+  async registerFailedUrl(url: string, reason: string): Promise<void> {
+    const existing = await this.failedUrlRepository.findOne({ where: { url } });
+    if (existing) {
+      existing.attempts += 1;
+      existing.reason = reason;
+      await this.failedUrlRepository.save(existing);
+    } else {
+      const failed = this.failedUrlRepository.create({
+        url,
+        reason,
+        attempts: 1
+      });
+      await this.failedUrlRepository.save(failed);
+    }
   }
 }

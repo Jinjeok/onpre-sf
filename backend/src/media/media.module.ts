@@ -5,9 +5,10 @@ import { MediaController } from './media.controller';
 import { Media } from './entities/media.entity';
 import { MinioModule } from '../minio/minio.module';
 import { DiscordModule } from '../discord/discord.module';
+import { FailedUrl } from './entities/failed-url.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Media]), MinioModule, forwardRef(() => DiscordModule)],
+  imports: [TypeOrmModule.forFeature([Media, FailedUrl]), MinioModule, forwardRef(() => DiscordModule)],
   controllers: [MediaController],
   providers: [MediaService],
   exports: [MediaService],

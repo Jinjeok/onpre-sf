@@ -207,6 +207,12 @@ export class DiscordService implements OnModuleInit {
             return false;
         }
 
+        // Check blacklist
+        if (await this.mediaService.isUrlFailed(url)) {
+            this.logger.warn(`Skipping blacklisted URL: ${url}`);
+            return false;
+        }
+
         const uniqueId = crypto.createHash('md5').update(url).digest('hex').substring(0, 8);
         const tempInput = path.join(os.tmpdir(), `${uniqueId}_input`);
 
@@ -318,29 +324,37 @@ export class DiscordService implements OnModuleInit {
 
             const minioUrl = this.minioService.getFileUrl(objectName);
 
-            await this.mediaService.create({
-                type,
-                minioUrl: minioUrl,
-                thumbnailUrl: thumbnailMinioUrl, // Store thumbnail URL
-                duration: duration, // Store video duration
-                discordMessageId: message.id,
-                originalChannel: message.channelId,
-                content: contentOverride ?? message.content,
-                discordCreatedAt: message.createdAt,
-                hash: contentHash
-            });
+            try {
+                const savedMedia = await this.mediaService.create({
+                    type,
+                    minioUrl: minioUrl,
+                    thumbnailUrl: thumbnailMinioUrl, // Store thumbnail URL
+                    duration: duration, // Store video duration
+                    discordMessageId: message.id,
+                    originalChannel: message.channelId,
+                    content: contentOverride ?? message.content,
+                    discordCreatedAt: message.createdAt,
+                    hash: contentHash
+                });
 
-            this.logger.log(`Saved ${type}: ${cleanName} (Hash: ${contentHash.substring(0, 8)})`);
+                this.logger.log(`Saved ${type}: ${cleanName} (Hash: ${contentHash.substring(0, 8)})`);
+            } catch (dbErr: any) {
+                if (dbErr.code === '23505') { // Unique violation
+                    // this.logger.warn(`Duplicate key error for ${objectName}: ${dbErr.detail}`);
+                } else {
+                    throw dbErr;
+                }
+            }
+
             await unlinkAsync(tempInput).catch(() => { });
             return true;
         } catch (err) {
             await unlinkAsync(tempInput).catch(() => { });
-            if (err.code === '23505') { // Unique violation
-                return true;
-            } else {
-                this.logger.error(`Error processing media ${url}: ${err.message}`, err.stack);
-                return false;
-            }
+            // Register failure
+            await this.mediaService.registerFailedUrl(url, err.message);
+
+            this.logger.error(`Error processing media ${url}: ${err.message}`);
+            return false;
         }
     }
 
