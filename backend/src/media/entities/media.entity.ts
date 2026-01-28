@@ -29,6 +29,9 @@ export class Media {
     @Column({ default: true })
     isAvailable: boolean;
 
+    @Column({ nullable: true })
+    thumbnailUrl: string;
+
     @CreateDateColumn()
     createdAt: Date;
 }

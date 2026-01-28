@@ -1,5 +1,6 @@
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import sharp from 'sharp';
 import { Client, GatewayIntentBits, Message, TextChannel, Collection } from 'discord.js';
 import { MinioService } from '../minio/minio.service';
 import { MediaService } from '../media/media.service';
@@ -279,11 +280,62 @@ export class DiscordService implements OnModuleInit {
                 'x-content-hash': contentHash
             });
 
+            // --- Thumbnail Generation ---
+            let thumbnailMinioUrl: string | undefined;
+            try {
+                let thumbBuffer: Buffer | null = null;
+                const thumbName = `${channelId}/${message.id}_${uniqueId}_${cleanName}_thumb.jpg`;
+
+                if (type === 'image') {
+                    // Generate Image Thumbnail (Resize)
+                    thumbBuffer = await sharp(fileBuffer)
+                        .resize(300, 300, { fit: 'inside', withoutEnlargement: true })
+                        .jpeg({ quality: 80 })
+                        .toBuffer();
+                } else if (type === 'video') {
+                    // Generate Video Thumbnail (Screenshot)
+                    const tempThumbPath = path.join(os.tmpdir(), `${uniqueId}_thumb.jpg`);
+                    try {
+                        await new Promise((resolve, reject) => {
+                            ffmpeg(tempInput)
+                                .screenshots({
+                                    count: 1,
+                                    folder: os.tmpdir(),
+                                    filename: `${uniqueId}_thumb.jpg`,
+                                    size: '300x?'
+                                })
+                                .on('end', resolve)
+                                .on('error', reject);
+                        });
+
+                        if (fs.existsSync(tempThumbPath)) {
+                            thumbBuffer = fs.readFileSync(tempThumbPath);
+                            await unlinkAsync(tempThumbPath).catch(() => { });
+                        }
+                    } catch (err) {
+                        this.logger.warn(`Failed to generate video thumbnail: ${err.message}`);
+                    }
+                }
+
+                if (thumbBuffer) {
+                    await this.minioService.uploadFile(thumbName, thumbBuffer, thumbBuffer.length, {
+                        'Content-Type': 'image/jpeg',
+                        'x-discord-message-id': message.id
+                    });
+                    thumbnailMinioUrl = this.minioService.getFileUrl(thumbName);
+                    this.logger.debug(`Generated and uploaded thumbnail: ${thumbName}`);
+                }
+            } catch (thumbError) {
+                this.logger.warn(`Thumbnail generation failed for ${cleanName}: ${thumbError.message}`);
+            }
+            // ----------------------------
+
             const minioUrl = this.minioService.getFileUrl(objectName);
 
             await this.mediaService.create({
                 type,
                 minioUrl: minioUrl,
+                thumbnailUrl: thumbnailMinioUrl, // Store thumbnail URL
                 discordMessageId: message.id,
                 originalChannel: message.channelId,
                 content: contentOverride ?? message.content,

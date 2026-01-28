@@ -399,6 +399,7 @@ interface MediaItem {
     id: string;
     type: string;
     minioUrl: string;
+    thumbnailUrl?: string;
     originalChannel: string;
     discordMessageId: string;
     content?: string;
@@ -773,7 +774,9 @@ export const ThumbnailGrid = () => {
                                 {group.media.length > 1 && (
                                     <CountBadge>1/{group.media.length}</CountBadge>
                                 )}
-                                {cover.type === 'video' ? (
+                                {cover.thumbnailUrl ? (
+                                    <img src={getFullUrl(cover.thumbnailUrl)} alt="cover" loading="lazy" />
+                                ) : cover.type === 'video' ? (
                                     <video src={getFullUrl(cover.minioUrl)} muted loop />
                                 ) : (
                                     <img src={getFullUrl(cover.minioUrl)} alt="cover" loading="lazy" />
