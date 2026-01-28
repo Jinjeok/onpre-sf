@@ -296,11 +296,34 @@ const FeedCard = ({ group, getFullUrl, onReportError }: { group: GroupedMedia, g
         setIndex((prev) => (prev - 1 + group.media.length) % group.media.length);
     };
 
+    // Keyboard Navigation (Horizontal)
+    useEffect(() => {
+        if (!inView) return;
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'ArrowLeft') {
+                e.preventDefault();
+                setIndex((prev) => (prev - 1 + group.media.length) % group.media.length);
+            } else if (e.key === 'ArrowRight') {
+                e.preventDefault();
+                setIndex((prev) => (prev + 1) % group.media.length);
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [inView, group.media.length]);
+
     const currentItem = group.media[index];
 
     return (
         <FeedItem ref={ref}>
             <FeedContent>
+                {group.media.length > 1 && (
+                    <CountBadge style={{ top: '10px', right: '10px', fontSize: '12px', padding: '4px 8px' }}>
+                        {index + 1}/{group.media.length}
+                    </CountBadge>
+                )}
                 {group.media.length > 1 && (
                     <NavButton className="prev" onClick={handlePrev}>‹</NavButton>
                 )}
