@@ -3,18 +3,18 @@
 # Enable modules: sudo a2enmod proxy proxy_http proxy_wstunnel ssl rewrite headers
 
 <VirtualHost *:80>
-    ServerName sf.mutsuki.kr
+    ServerName example.com
     RewriteEngine On
-    RewriteCond %{SERVER_NAME} =sf.mutsuki.kr
+    RewriteCond %{SERVER_NAME} =example.com
     RewriteRule ^ https://%{SERVER_NAME}%{REQUEST_URI} [END,NE,R=permanent]
 </VirtualHost>
 
 <VirtualHost *:443>
-    ServerName sf.mutsuki.kr
+    ServerName example.com
 
     SSLEngine on
-    SSLCertificateFile /etc/letsencrypt/live/sf.mutsuki.kr/fullchain.pem
-    SSLCertificateKeyFile /etc/letsencrypt/live/sf.mutsuki.kr/privkey.pem
+    SSLCertificateFile /etc/letsencrypt/live/example.com/fullchain.pem
+    SSLCertificateKeyFile /etc/letsencrypt/live/example.com/privkey.pem
 
     # Security Headers
     Header always set Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
@@ -44,6 +44,6 @@
     LimitRequestBody 0
     ProxyTimeout 300
 
-    ErrorLog ${APACHE_LOG_DIR}/sf.mutsuki.kr-error.log
-    CustomLog ${APACHE_LOG_DIR}/sf.mutsuki.kr-access.log combined
+    ErrorLog ${APACHE_LOG_DIR}/example.com-error.log
+    CustomLog ${APACHE_LOG_DIR}/example.com-access.log combined
 </VirtualHost>

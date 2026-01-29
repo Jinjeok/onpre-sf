@@ -21,9 +21,11 @@ export class AuthController {
     @UseGuards(AuthGuard('google'))
     async googleAuthCallback(@Req() req: any, @Res() res: Response) {
         const { access_token } = await this.authService.login(req.user);
-        const frontendUrl = this.configService.get<string>('VITE_API_URL')?.replace(/:\d+$/, '') || '';
-        const frontendPort = this.configService.get<string>('PORT_FRONTEND') || '5173';
-        res.redirect(`${frontendUrl}:${frontendPort}/?token=${access_token}`);
+        // Use FRONTEND_URL if set, otherwise use VITE_API_URL base
+        const frontendUrl = this.configService.get<string>('FRONTEND_URL')
+            || this.configService.get<string>('VITE_API_URL')?.replace(/\/api$/, '')
+            || 'http://localhost:5173';
+        res.redirect(`${frontendUrl}/?token=${access_token}`);
     }
 }
 
