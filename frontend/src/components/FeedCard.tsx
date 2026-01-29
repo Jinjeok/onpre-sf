@@ -46,15 +46,25 @@ export const FeedCard = ({ group, getFullUrl, onReportError, globalVolume }: Fee
         if (!cardNode) return;
 
         const videos = cardNode.querySelectorAll('video');
-        videos.forEach(video => {
-            if (video !== videoRef.current) {
-                video.pause();
-            }
-        });
 
-        if (inView && videoRef.current) {
-            videoRef.current.volume = globalVolume;
-            videoRef.current.play().catch(() => { });
+        if (!inView) {
+            // Not in view: pause ALL videos in this card
+            videos.forEach(video => {
+                video.pause();
+                video.muted = true;
+            });
+        } else {
+            // In view: pause all except current, play current
+            videos.forEach((video, idx) => {
+                if (idx === index) {
+                    video.muted = false;
+                    video.volume = globalVolume;
+                    video.play().catch(() => { });
+                } else {
+                    video.pause();
+                    video.muted = true;
+                }
+            });
         }
     }, [inView, index, cardNode, globalVolume]);
 

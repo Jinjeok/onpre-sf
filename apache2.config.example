@@ -31,6 +31,7 @@
     ProxyPass /feed http://localhost:9004/feed
     ProxyPassReverse /feed http://localhost:9004/feed
     
+    # Google OAuth SSO endpoints (/auth/google, /auth/google/callback)
     ProxyPass /auth http://localhost:9004/auth
     ProxyPassReverse /auth http://localhost:9004/auth
 

@@ -154,6 +154,11 @@ export const ThumbnailGrid = () => {
             if (e.key === 'ArrowDown') {
                 e.preventDefault();
                 container.scrollBy({ top: window.innerHeight, behavior: 'smooth' });
+                // Check if near bottom and load more
+                const remaining = container.scrollHeight - (container.scrollTop + container.clientHeight);
+                if (remaining < window.innerHeight * 2) {
+                    loadFeed();
+                }
             } else if (e.key === 'ArrowUp') {
                 e.preventDefault();
                 container.scrollBy({ top: -window.innerHeight, behavior: 'smooth' });
@@ -161,7 +166,7 @@ export const ThumbnailGrid = () => {
         };
         window.addEventListener('keydown', handleKeys);
         return () => window.removeEventListener('keydown', handleKeys);
-    }, [viewMode]);
+    }, [viewMode, loadFeed]);
 
     const loadList = async (isReset = false) => {
         if (loadingRef.current || (!hasMore && !isReset)) return;
