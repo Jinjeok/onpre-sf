@@ -105,10 +105,21 @@ export const MediaModal = ({
             // Keep origin for smooth zoom out
         } else {
             const rect = e.currentTarget.getBoundingClientRect();
+
+            // Calculate dynamic zoom level based on image size vs screen size
+            // Goal: After zoom, image should fill approximately 90% of screen height
+            const targetHeight = window.innerHeight * 0.9;
+            const currentHeight = rect.height;
+            let calculatedZoom = targetHeight / currentHeight;
+
+            // Clamp zoom between 1.2x and 2.5x
+            calculatedZoom = Math.min(Math.max(calculatedZoom, 1.2), 2.5);
+
+            // Set origin to click position
             const x = ((e.clientX - rect.left) / rect.width) * 100;
             const y = ((e.clientY - rect.top) / rect.height) * 100;
             setOrigin({ x, y });
-            setZoomLevel(1.5); // 1.5x zoom
+            setZoomLevel(calculatedZoom);
         }
     };
 
