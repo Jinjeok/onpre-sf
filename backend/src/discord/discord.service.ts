@@ -49,6 +49,13 @@ export class DiscordService implements OnModuleInit {
         });
 
         this.client.on('messageCreate', (message) => this.handleMessage(message));
+        this.client.on('messageUpdate', (oldMessage, newMessage) => {
+            if (newMessage.partial) {
+                newMessage.fetch().then(msg => this.handleMessageUpdate(oldMessage as Message, msg)).catch(e => this.logger.error(`Failed to fetch updated message: ${e}`));
+            } else {
+                this.handleMessageUpdate(oldMessage as Message, newMessage as Message);
+            }
+        });
 
         const token = this.configService.get<string>('DISCORD_BOT_TOKEN');
         if (token) {
@@ -140,13 +147,29 @@ export class DiscordService implements OnModuleInit {
         }
     }
 
+    async handleMessageUpdate(oldMsg: Message, newMsg: Message) {
+        if (!newMsg.author || newMsg.author.bot || !this.channelIds.includes(newMsg.channelId)) return;
+
+        // Check if embeds changed (e.g. link unfurled)
+        const oldEmbeds = oldMsg.embeds?.length || 0;
+        const newEmbeds = newMsg.embeds?.length || 0;
+
+        if (newEmbeds > oldEmbeds) {
+            this.logger.debug(`Message ${newMsg.id} updated with new embeds (Old: ${oldEmbeds}, New: ${newEmbeds}). Processing...`);
+            await this.handleMessage(newMsg);
+        }
+    }
+
     async handleMessage(message: Message) {
         if (message.author.bot || !this.channelIds.includes(message.channelId)) return;
+
+        this.logger.debug(`[HandleMessage] Processing ${message.id} | Attachments: ${message.attachments.size} | Embeds: ${message.embeds.length} | Snapshots: ${(message as any).messageSnapshots?.size || 0}`);
 
         // 1. Process Attachments
         if (message.attachments.size > 0) {
             let attachIdx = 0;
             for (const [, attachment] of message.attachments) {
+                this.logger.debug(`  - Processing Attachment: ${attachment.name} (${attachment.contentType})`);
                 await this.processMediaUrl(message, attachment.url, attachment.contentType, attachment.name, attachment.size, attachIdx++);
             }
         }
@@ -155,7 +178,8 @@ export class DiscordService implements OnModuleInit {
         if (message.embeds.length > 0) {
             let embedIdx = 0;
             for (const embed of message.embeds) {
-                // this.logger.debug(`Inspecting Embed: ${JSON.stringify(embed)}`);
+                this.logger.debug(`  - Inspecting Embed ${embedIdx}: Type=${embed.type}, Provider=${embed.provider?.name}, Video=${!!embed.video}, Image=${!!embed.image}, Thumbnail=${!!embed.thumbnail}`);
+
                 if (embed.video && embed.video.url) {
                     await this.processMediaUrl(message, embed.video.url, 'video/embed', `embed_video_${message.id}`, 0, embedIdx++);
                 }
@@ -163,6 +187,7 @@ export class DiscordService implements OnModuleInit {
                     await this.processMediaUrl(message, embed.image.url, 'image/embed', `embed_image_${message.id}`, 0, embedIdx++);
                 }
                 else if (embed.thumbnail && embed.thumbnail.url) {
+                    // Start strict: only process thumbnail if it likely represents the content and we missed main video/image
                     await this.processMediaUrl(message, embed.thumbnail.url, 'image/embed', `embed_thumb_${message.id}`, 0, embedIdx++);
                 }
             }
@@ -174,12 +199,14 @@ export class DiscordService implements OnModuleInit {
                 if (snapshot.attachments && snapshot.attachments.size > 0) {
                     let attachIdx = 0;
                     for (const [, attachment] of snapshot.attachments) {
+                        this.logger.debug(`  - Snapshot Attachment: ${attachment.url}`);
                         await this.processMediaUrl(message, attachment.url, attachment.contentType, attachment.name, attachment.size, attachIdx++, snapshot.content);
                     }
                 }
                 if (snapshot.embeds && snapshot.embeds.length > 0) {
                     let embedIdx = 0;
                     for (const embed of snapshot.embeds) {
+                        this.logger.debug(`  - Snapshot Embed ${embedIdx}: Video=${!!embed.video}`);
                         if (embed.video && embed.video.url) {
                             await this.processMediaUrl(message, embed.video.url, 'video/embed', `forward_video_${message.id}`, 0, embedIdx++, snapshot.content);
                         }
