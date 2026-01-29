@@ -43,6 +43,7 @@ export const MediaModal = ({
     // Zoom & Pan State
     const [zoomLevel, setZoomLevel] = useState(1);
     const [pan, setPan] = useState({ x: 0, y: 0 });
+    const [origin, setOrigin] = useState({ x: 50, y: 50 });
     const [isDragging, setIsDragging] = useState(false);
     const dragStartRef = useRef<{ x: number, y: number } | null>(null);
     const panStartRef = useRef<{ x: number, y: number }>({ x: 0, y: 0 });
@@ -52,6 +53,7 @@ export const MediaModal = ({
     useEffect(() => {
         setZoomLevel(1);
         setPan({ x: 0, y: 0 });
+        setOrigin({ x: 50, y: 50 });
     }, [selectedIndex]);
 
     // Sync modal index on scroll
@@ -77,8 +79,10 @@ export const MediaModal = ({
         e?.stopPropagation();
         const next = (selectedIndex + 1) % group.media.length;
         modalScrollTo(next);
+        modalScrollTo(next);
         setZoomLevel(1);
         setPan({ x: 0, y: 0 });
+        setOrigin({ x: 50, y: 50 });
     };
 
     const handlePrev = (e?: React.MouseEvent) => {
@@ -87,6 +91,7 @@ export const MediaModal = ({
         modalScrollTo(prev);
         setZoomLevel(1);
         setPan({ x: 0, y: 0 });
+        setOrigin({ x: 50, y: 50 });
     };
 
     const handleZoomToggle = (e: React.MouseEvent) => {
@@ -97,8 +102,13 @@ export const MediaModal = ({
         if (zoomLevel > 1) {
             setZoomLevel(1);
             setPan({ x: 0, y: 0 });
+            // Keep origin for smooth zoom out
         } else {
-            setZoomLevel(2.5); // Fixed zoom ratio
+            const rect = e.currentTarget.getBoundingClientRect();
+            const x = ((e.clientX - rect.left) / rect.width) * 100;
+            const y = ((e.clientY - rect.top) / rect.height) * 100;
+            setOrigin({ x, y });
+            setZoomLevel(1.5); // 1.5x zoom
         }
     };
 
@@ -202,7 +212,7 @@ export const MediaModal = ({
                                                 maxWidth: zoomLevel > 1 ? 'none' : '100%',
                                                 display: 'block',
                                                 transform: `scale(${idx === selectedIndex ? zoomLevel : 1}) translate(${idx === selectedIndex ? pan.x / zoomLevel : 0}px, ${idx === selectedIndex ? pan.y / zoomLevel : 0}px)`,
-                                                transformOrigin: 'center center',
+                                                transformOrigin: `${origin.x}% ${origin.y}%`,
                                                 transition: isDragging ? 'none' : 'transform 0.2s',
                                                 userSelect: 'none'
                                             }}

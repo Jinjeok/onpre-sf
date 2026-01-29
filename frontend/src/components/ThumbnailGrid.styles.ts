@@ -184,7 +184,7 @@ export const ModalContentWrapper = styled.div`
   justify-content: center;
   align-items: center;
   width: 100%;
-  max-height: 85vh; /* Reserve space for info panel */
+  height: 100%;
   position: relative;
 `;
 
@@ -217,6 +217,11 @@ export const InfoPanel = styled.div`
   flex-direction: column;
   justify-content: center;
   transition: transform 0.3s ease-in-out;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  background: rgba(22, 27, 34, 0.95); /* Slightly transparent background */
+  backdrop-filter: blur(5px);
 
   &.hidden {
     transform: translateY(100%);
