@@ -163,13 +163,10 @@ export class DiscordService implements OnModuleInit {
     async handleMessage(message: Message) {
         if (message.author.bot || !this.channelIds.includes(message.channelId)) return;
 
-        this.logger.debug(`[HandleMessage] Processing ${message.id} | Attachments: ${message.attachments.size} | Embeds: ${message.embeds.length} | Snapshots: ${(message as any).messageSnapshots?.size || 0}`);
-
         // 1. Process Attachments
         if (message.attachments.size > 0) {
             let attachIdx = 0;
             for (const [, attachment] of message.attachments) {
-                this.logger.debug(`  - Processing Attachment: ${attachment.name} (${attachment.contentType})`);
                 await this.processMediaUrl(message, attachment.url, attachment.contentType, attachment.name, attachment.size, attachIdx++);
             }
         }
@@ -178,8 +175,6 @@ export class DiscordService implements OnModuleInit {
         if (message.embeds.length > 0) {
             let embedIdx = 0;
             for (const embed of message.embeds) {
-                this.logger.debug(`  - Inspecting Embed ${embedIdx}: Type=${embed.data.type}, Provider=${embed.provider?.name}, Video=${!!embed.video}, Image=${!!embed.image}, Thumbnail=${!!embed.thumbnail}`);
-
                 if (embed.video && embed.video.url) {
                     await this.processMediaUrl(message, embed.video.url, 'video/embed', `embed_video_${message.id}`, 0, embedIdx++);
                 }
@@ -199,14 +194,12 @@ export class DiscordService implements OnModuleInit {
                 if (snapshot.attachments && snapshot.attachments.size > 0) {
                     let attachIdx = 0;
                     for (const [, attachment] of snapshot.attachments) {
-                        this.logger.debug(`  - Snapshot Attachment: ${attachment.url}`);
                         await this.processMediaUrl(message, attachment.url, attachment.contentType, attachment.name, attachment.size, attachIdx++, snapshot.content);
                     }
                 }
                 if (snapshot.embeds && snapshot.embeds.length > 0) {
                     let embedIdx = 0;
                     for (const embed of snapshot.embeds) {
-                        this.logger.debug(`  - Snapshot Embed ${embedIdx}: Video=${!!embed.video}`);
                         if (embed.video && embed.video.url) {
                             await this.processMediaUrl(message, embed.video.url, 'video/embed', `forward_video_${message.id}`, 0, embedIdx++, snapshot.content);
                         }
