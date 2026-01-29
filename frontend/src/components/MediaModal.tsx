@@ -223,8 +223,8 @@ export const MediaModal = ({
                                             alt="full"
                                             onClick={handleZoomToggle}
                                             style={{
-                                                maxHeight: zoomLevel > 1 ? 'none' : '80vh',
-                                                maxWidth: zoomLevel > 1 ? 'none' : '100%',
+                                                maxHeight: zoomLevel > 1 ? '90vh' : '80vh',
+                                                maxWidth: zoomLevel > 1 ? '90vw' : '100%',
                                                 display: 'block',
                                                 transform: `scale(${idx === selectedIndex ? zoomLevel : 1}) translate(${idx === selectedIndex ? pan.x / zoomLevel : 0}px, ${idx === selectedIndex ? pan.y / zoomLevel : 0}px)`,
                                                 transformOrigin: `${origin.x}% ${origin.y}%`,
