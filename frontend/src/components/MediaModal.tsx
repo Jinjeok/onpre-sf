@@ -116,8 +116,11 @@ export const MediaModal = ({
             const zoomByWidth = targetWidth / rect.width;
             let calculatedZoom = Math.min(zoomByHeight, zoomByWidth);
 
-            // Clamp zoom between 1.2x and 2.5x
-            calculatedZoom = Math.min(Math.max(calculatedZoom, 1.2), 2.5);
+            // Apply slight magnification (1.2x of fit) to ensure it feels "zoomed in"
+            calculatedZoom = calculatedZoom * 1.2;
+
+            // Clamp zoom between 1.2x and 3.5x
+            calculatedZoom = Math.min(Math.max(calculatedZoom, 1.2), 3.5);
 
             // Set origin to click position
             const x = ((e.clientX - rect.left) / rect.width) * 100;
@@ -197,7 +200,7 @@ export const MediaModal = ({
                                 <MediaContent
                                     onClick={e => e.stopPropagation()}
                                     style={{
-                                        overflow: 'hidden',
+                                        overflow: zoomLevel > 1 ? 'visible' : 'hidden',
                                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                                         cursor: zoomLevel > 1 ? (isDragging ? 'grabbing' : 'grab') : 'zoom-in'
                                     }}
@@ -223,8 +226,8 @@ export const MediaModal = ({
                                             alt="full"
                                             onClick={handleZoomToggle}
                                             style={{
-                                                maxHeight: zoomLevel > 1 ? '90vh' : '80vh',
-                                                maxWidth: zoomLevel > 1 ? '90vw' : '100%',
+                                                maxHeight: zoomLevel > 1 ? '95vh' : '80vh',
+                                                maxWidth: zoomLevel > 1 ? '95vw' : '100%',
                                                 display: 'block',
                                                 transform: `scale(${idx === selectedIndex ? zoomLevel : 1}) translate(${idx === selectedIndex ? pan.x / zoomLevel : 0}px, ${idx === selectedIndex ? pan.y / zoomLevel : 0}px)`,
                                                 transformOrigin: `${origin.x}% ${origin.y}%`,
