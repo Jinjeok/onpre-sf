@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useInView } from 'react-intersection-observer';
+import styled from 'styled-components';
 import { useDraggableScroll } from './useDraggableScroll';
 import type { GroupedMedia } from './thumbnailGrid.types';
 import {
@@ -10,6 +11,25 @@ import {
     CountBadge,
     NavButton
 } from './ThumbnailGrid.styles';
+
+// Progress bar styles
+const ProgressBarContainer = styled.div`
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 100;
+`;
+
+const ProgressBarFill = styled.div<{ $progress: number }>`
+    height: 100%;
+    background: linear-gradient(90deg, #8b5cf6 0%, #a855f7 50%, #c084fc 100%);
+    width: ${props => props.$progress}%;
+    transition: width 0.1s linear;
+    box-shadow: 0 0 8px rgba(168, 85, 247, 0.6);
+`;
 
 interface FeedCardProps {
     group: GroupedMedia;
@@ -24,7 +44,9 @@ interface FeedCardProps {
  */
 export const FeedCard = ({ group, getFullUrl, onReportError, globalVolume }: FeedCardProps) => {
     const [index, setIndex] = useState(0);
+    const [videoProgress, setVideoProgress] = useState(0);
     const videoRef = useRef<HTMLVideoElement>(null);
+    const animationRef = useRef<number | null>(null);
     const { ref: inViewRef, inView } = useInView({ threshold: 0.6 });
     const { ref: scrollRef, ...dragProps } = useDraggableScroll();
 
@@ -105,6 +127,42 @@ export const FeedCard = ({ group, getFullUrl, onReportError, globalVolume }: Fee
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [inView, index, group.media.length]);
 
+    // Video Progress Tracking for Progress Bar
+    useEffect(() => {
+        const currentMedia = group.media[index];
+        const isCurrentVideo = currentMedia?.type === 'video';
+
+        if (!inView || !isCurrentVideo || !cardNode) {
+            setVideoProgress(0);
+            if (animationRef.current) {
+                cancelAnimationFrame(animationRef.current);
+                animationRef.current = null;
+            }
+            return;
+        }
+
+        const updateProgress = () => {
+            const videos = cardNode.querySelectorAll('video');
+            const currentVideo = videos[index] as HTMLVideoElement | undefined;
+
+            if (currentVideo && currentVideo.duration && isFinite(currentVideo.duration)) {
+                const progress = (currentVideo.currentTime / currentVideo.duration) * 100;
+                setVideoProgress(progress);
+            }
+
+            animationRef.current = requestAnimationFrame(updateProgress);
+        };
+
+        animationRef.current = requestAnimationFrame(updateProgress);
+
+        return () => {
+            if (animationRef.current) {
+                cancelAnimationFrame(animationRef.current);
+                animationRef.current = null;
+            }
+        };
+    }, [inView, index, cardNode, group.media]);
+
     return (
         <FeedItem ref={setRefs}>
             <HorizontalScroll
@@ -146,6 +204,13 @@ export const FeedCard = ({ group, getFullUrl, onReportError, globalVolume }: Fee
                     <NavButton className="prev" onClick={handlePrev} style={{ zIndex: 10 }}>‹</NavButton>
                     <NavButton className="next" onClick={handleNext} style={{ zIndex: 10 }}>›</NavButton>
                 </>
+            )}
+
+            {/* Video Progress Bar - Only show when current item is a video */}
+            {group.media[index]?.type === 'video' && (
+                <ProgressBarContainer>
+                    <ProgressBarFill $progress={videoProgress} />
+                </ProgressBarContainer>
             )}
         </FeedItem>
     );
