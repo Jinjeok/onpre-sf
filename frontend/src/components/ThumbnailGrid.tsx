@@ -971,7 +971,7 @@ export const ThumbnailGrid = () => {
                         <ToggleButton onClick={async () => {
                             if (!window.confirm('Sync Discord metadata for recent items? This will update titles and descriptions.')) return;
                             try {
-                                await axios.post('/api/feed/sync-metadata');
+                                await api.post('/feed/sync-metadata');
                                 alert('Sync started! Check logs or refresh in a moment.');
                             } catch (e) {
                                 alert('Sync failed');
