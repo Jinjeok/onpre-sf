@@ -408,16 +408,39 @@ const FeedCard = ({ group, getFullUrl, onReportError }: { group: GroupedMedia, g
 
     // Keep video logic, but only for the CURRENT item in visual field
     useEffect(() => {
-        if (videoRef.current) {
-            videoRef.current.volume = 0.5;
-            if (inView) {
-                videoRef.current.play().catch(() => { });
-            } else {
-                videoRef.current.pause();
-                videoRef.current.currentTime = 0;
-            }
+        // Pause ALL videos in this card first to prevent overlap
+        if (inView) { // Assuming we can access the container via a ref or query selector
+            // We'll rely on side-effect of videoRef being the ONLY one active?
+            // No, we need to pause others.
+            // Let's use `inViewRef` (which is the FeedItem root) to find all videos.
+            // However, `inViewRef` from `useInView` might not expose the underlying node directly if it's a callback ref.
+            // `react-intersection-observer`'s `ref` IS a callback.
+            // We need to capture the node.
         }
     }, [inView, index]);
+
+    // Better approach: Capture node in a separate ref like TwitterFeedCard
+    const [cardNode, setCardNode] = useState<HTMLDivElement | null>(null);
+    const setRefs = useCallback((node: HTMLDivElement | null) => {
+        inViewRef(node);
+        setCardNode(node);
+    }, [inViewRef]);
+
+    useEffect(() => {
+        if (!cardNode) return;
+
+        const videos = cardNode.querySelectorAll('video');
+        videos.forEach(video => {
+            // We can identify the current video by checking if it matches videoRef.current
+            // OR we can just pause all, and then play videoRef.current
+            video.pause();
+        });
+
+        if (inView && videoRef.current) {
+            videoRef.current.volume = 0.5;
+            videoRef.current.play().catch(() => { });
+        }
+    }, [inView, index, cardNode]);
 
     const scrollTo = (idx: number) => {
         if (scrollRef.current) {
@@ -457,7 +480,7 @@ const FeedCard = ({ group, getFullUrl, onReportError }: { group: GroupedMedia, g
     }, [inView, index, group.media.length]);
 
     return (
-        <FeedItem ref={inViewRef}>
+        <FeedItem ref={setRefs}>
             <HorizontalScroll
                 ref={scrollRef}
                 onScroll={handleScroll}
@@ -539,10 +562,12 @@ const AttachmentScroll = styled.div`
   scroll-behavior: smooth;
   padding-bottom: 4px; /* Space for scrollbar */
   
-  &::-webkit-scrollbar { height: 6px; }
-  &::-webkit-scrollbar-track { background: transparent; }
-  &::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
+  &::-webkit-scrollbar { height: 10px; }
+  &::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+  &::-webkit-scrollbar-thumb { background: #30363d; border-radius: 5px; border: 2px solid #161b22; }
   &::-webkit-scrollbar-thumb:hover { background: #58a6ff; }
+  cursor: grab;
+  &:active { cursor: grabbing; }
 `;
 
 const AttachmentItem = styled.div<{ $isSingle?: boolean }>`
@@ -562,15 +587,73 @@ const AttachmentItem = styled.div<{ $isSingle?: boolean }>`
 const TwitterFeedCard = ({ group, getFullUrl, onZoom }: { group: GroupedMedia, getFullUrl: (url: string) => string, onZoom: (url: string, type: 'image' | 'video') => void }) => {
     const isSingle = group.media.length === 1;
 
+    // Auto-play on focus
+    const { ref: cardRef, inView } = useInView({
+        threshold: 0.6, // Play when 60% visible (focused)
+    });
+
+    const [cardNode, setCardNode] = useState<HTMLDivElement | null>(null);
+
+    // Merge refs
+    const setRefs = useCallback((node: HTMLDivElement | null) => {
+        // useInView Ref
+        cardRef(node);
+        setCardNode(node);
+    }, [cardRef]);
+
+    useEffect(() => {
+        if (!cardNode) return;
+        const videos = cardNode.querySelectorAll('video');
+        videos.forEach(video => {
+            if (inView) {
+                // Try playing. Muted is usually required for auto-play
+                video.play().catch(() => { });
+            } else {
+                video.pause();
+            }
+        });
+    }, [inView, cardNode]);
+
+
+    // Drag Scroll Logic
+    const scrollRef = useRef<HTMLDivElement>(null);
+    const [isDown, setIsDown] = useState(false);
+    const [startX, setStartX] = useState(0);
+    const [scrollLeft, setScrollLeft] = useState(0);
+
+    const handleMouseDown = (e: React.MouseEvent) => {
+        if (!scrollRef.current) return;
+        setIsDown(true);
+        setStartX(e.pageX - scrollRef.current.offsetLeft);
+        setScrollLeft(scrollRef.current.scrollLeft);
+    };
+
+    const handleMouseLeave = () => setIsDown(false);
+    const handleMouseUp = () => setIsDown(false);
+
+    const handleMouseMove = (e: React.MouseEvent) => {
+        if (!isDown || !scrollRef.current) return;
+        e.preventDefault();
+        const x = e.pageX - scrollRef.current.offsetLeft;
+        const walk = (x - startX) * 2; // Scroll-fast
+        scrollRef.current.scrollLeft = scrollLeft - walk;
+    };
+
     return (
-        <TwitterCardContainer>
+        <TwitterCardContainer ref={setRefs}>
             <CardHeader>
                 <span>{new Date(group.discordCreatedAt || group.createdAt).toLocaleString()}</span>
-                {/* Could add Discord link here */}
             </CardHeader>
             {group.content && <CardContent>{group.content}</CardContent>}
 
-            <AttachmentScroll>
+            {/* Drag Events */}
+            <AttachmentScroll
+                ref={scrollRef}
+                onMouseDown={handleMouseDown}
+                onMouseLeave={handleMouseLeave}
+                onMouseUp={handleMouseUp}
+                onMouseMove={handleMouseMove}
+            >
                 {group.media.map(item => (
                     <AttachmentItem key={item.id} $isSingle={isSingle}>
                         {item.type === 'video' ? (
@@ -579,6 +662,7 @@ const TwitterFeedCard = ({ group, getFullUrl, onZoom }: { group: GroupedMedia, g
                                 controls
                                 loop
                                 playsInline
+                                muted // Required for auto-play
                                 style={{ maxWidth: '100%', maxHeight: '600px', display: 'block' }}
                             />
                         ) : (
@@ -588,6 +672,7 @@ const TwitterFeedCard = ({ group, getFullUrl, onZoom }: { group: GroupedMedia, g
                                 loading="lazy"
                                 style={{ maxWidth: '100%', maxHeight: '600px', display: 'block', cursor: 'zoom-in' }}
                                 onClick={() => onZoom(getFullUrl(item.minioUrl), 'image')}
+                                onDragStart={(e) => e.preventDefault()} // Prevent image drag
                             />
                         )}
                     </AttachmentItem>
@@ -797,10 +882,29 @@ export const ThumbnailGrid = () => {
         if (viewMode === 'list' && inView && hasMore && !loading) {
             loadList();
         }
-        if (viewMode === 'feed' && feedInView && !feedLoading) {
+        if ((viewMode === 'feed' || viewMode === 'swipe') && feedInView && !feedLoading) {
             loadFeed();
         }
     }, [inView, feedInView, hasMore, loading, feedLoading, viewMode, loadFeed, sortBy, sortOrder]);
+
+    // Swipe Mode Keyboard Navigation (Global)
+    const feedContainerRef = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        if (viewMode !== 'swipe') return;
+        const handleKeys = (e: KeyboardEvent) => {
+            if (!feedContainerRef.current) return;
+            const container = feedContainerRef.current;
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                container.scrollBy({ top: window.innerHeight, behavior: 'smooth' });
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                container.scrollBy({ top: -window.innerHeight, behavior: 'smooth' });
+            }
+        };
+        window.addEventListener('keydown', handleKeys);
+        return () => window.removeEventListener('keydown', handleKeys);
+    }, [viewMode]);
 
     const loadList = async (isReset = false) => {
         if (loadingRef.current || (!hasMore && !isReset)) return;
@@ -1153,7 +1257,7 @@ export const ThumbnailGrid = () => {
 
             {
                 viewMode === 'swipe' && (
-                    <FeedContainer className="feed-container">
+                    <FeedContainer ref={feedContainerRef} className="feed-container">
                         {feedItems.map((group, idx) => (
                             <FeedCard
                                 key={`${group.discordMessageId}-${idx}`}
@@ -1191,9 +1295,11 @@ export const ThumbnailGrid = () => {
                 selectedGroup && (
                     <Overlay onClick={() => setSelectedGroup(null)}>
                         <CloseButton onClick={(e) => { e.stopPropagation(); setSelectedGroup(null); }}>×</CloseButton>
-                        <ModalContainer onClick={e => e.stopPropagation()}>
+                        <ModalContainer onClick={() => setSelectedGroup(null)} style={{ cursor: 'pointer' }}>
+                            {/* Allow background click to close by removing stopPropagation from container, 
+                        BUT properly stop it on interactive children */}
                             {selectedGroup.media.length > 1 && (
-                                <NavButton className="prev" onClick={handlePrev}>‹</NavButton>
+                                <NavButton className="prev" onClick={(e) => { e.stopPropagation(); handlePrev() }}>‹</NavButton>
                             )}
                             <ModalContentWrapper>
                                 <HorizontalScroll
@@ -1238,7 +1344,7 @@ export const ThumbnailGrid = () => {
                                 </HorizontalScroll>
                             </ModalContentWrapper>
                             {selectedGroup.media.length > 1 && (
-                                <NavButton className="next" onClick={handleNext}>›</NavButton>
+                                <NavButton className="next" onClick={(e) => { e.stopPropagation(); handleNext() }}>›</NavButton>
                             )}
                             <InfoPanel onClick={e => e.stopPropagation()}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
