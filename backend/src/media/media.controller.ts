@@ -20,6 +20,12 @@ export class MediaController {
     return this.discordService.redownloadMedia(id);
   }
 
+  @Post('sync-metadata')
+  @UseGuards(JwtAuthGuard)
+  async syncMetadata() {
+    return this.discordService.syncMetadata();
+  }
+
   @Get()
   @UseGuards(JwtAuthGuard)
   getFeed(@Query('type') type?: string, @Query('limit') limit?: number) {

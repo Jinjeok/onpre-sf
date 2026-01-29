@@ -160,6 +160,92 @@ export class DiscordService implements OnModuleInit {
         }
     }
 
+    private extractEmbedContent(embed: any): string | undefined {
+        const parts: string[] = [];
+
+        if (embed.author?.name) parts.push(`👤 ${embed.author.name}`);
+        if (embed.title) parts.push(`**${embed.title}**`);
+        if (embed.description) parts.push(embed.description);
+
+        if (embed.fields && embed.fields.length > 0) {
+            for (const field of embed.fields) {
+                parts.push(`**${field.name}**: ${field.value}`);
+            }
+        }
+
+        if (embed.footer?.text) {
+            // User said footer is optional/not needed, but maybe keep it if it adds context? 
+            // User said "Start strict: only process thumbnail if it likely represents the content..." 
+            // User said "footer is not needed" in prompt "밑에 푸터는 없어도 됨"
+            // So I will OMIT footer for now.
+        }
+
+        return parts.length > 0 ? parts.join('\n\n') : undefined;
+    }
+
+    async syncMetadata() {
+        this.logger.log('Starting Metadata Sync...');
+
+        // 1. Get all media items that have a Discord Message ID
+        // We need a method in MediaService to fetch these, or use a repository if we inject it.
+        // Since we injected MediaService, let's assume we can add a method there or use what we have.
+        // Ideally we iterate. For now, let's ask MediaService to give us recent items.
+
+        const allMedia = await this.mediaService.findAllWithDiscordId(); // Need to implement this
+        this.logger.log(`Found ${allMedia.length} items to check.`);
+
+        let updatedCount = 0;
+
+        for (const media of allMedia) {
+            try {
+                // If content is already rich, maybe skip? But user wants to SYNC.
+                // Fetch message
+                // We need channel ID. Media entity has `originalChannel` but that might be channel Name or ID?
+                // Let's assume we can try to find the channel.
+                // Wait, media.originalChannel IS the channel ID usually in this system? 
+                // Let's check how we save it.
+                // In processMediaUrl: const channelId = message.channelId; ... originalChannel: channelId
+
+                const channelId = media.originalChannel;
+                const messageId = media.discordMessageId;
+
+                const channel = await this.client.channels.fetch(channelId) as TextChannel;
+                if (!channel) continue;
+
+                const message = await channel.messages.fetch(messageId);
+                if (!message) continue;
+
+                // Re-extract content
+                let newContent: string | undefined;
+
+                // Priority: Embeds -> Content (if direct message has text)
+                if (message.embeds.length > 0) {
+                    // Find the embed that likely matched this media? 
+                    // It's hard to know WHICH embed matched this specific file if there are multiple.
+                    // But usually tweets have 1 main embed.
+                    // Let's just take the first rich embed?
+                    const embed = message.embeds[0];
+                    newContent = this.extractEmbedContent(embed);
+                }
+
+                if (!newContent && message.content) {
+                    newContent = message.content;
+                }
+
+                if (newContent && newContent !== media.content) {
+                    await this.mediaService.updateContent(media.id, newContent);
+                    updatedCount++;
+                }
+
+            } catch (e) {
+                this.logger.warn(`Failed to sync metadata for ${media.id}: ${e.message}`);
+            }
+        }
+
+        this.logger.log(`Metadata Sync Complete. Updated ${updatedCount} items.`);
+        return { updated: updatedCount, total: allMedia.length };
+    }
+
     async handleMessage(message: Message) {
         if (message.author.bot || !this.channelIds.includes(message.channelId)) return;
 
@@ -175,15 +261,17 @@ export class DiscordService implements OnModuleInit {
         if (message.embeds.length > 0) {
             let embedIdx = 0;
             for (const embed of message.embeds) {
+                const contentOverride = this.extractEmbedContent(embed);
+
                 if (embed.video && embed.video.url) {
-                    await this.processMediaUrl(message, embed.video.url, 'video/embed', `embed_video_${message.id}`, 0, embedIdx++);
+                    await this.processMediaUrl(message, embed.video.url, 'video/embed', `embed_video_${message.id}`, 0, embedIdx++, contentOverride);
                 }
                 else if (embed.image && embed.image.url) {
-                    await this.processMediaUrl(message, embed.image.url, 'image/embed', `embed_image_${message.id}`, 0, embedIdx++);
+                    await this.processMediaUrl(message, embed.image.url, 'image/embed', `embed_image_${message.id}`, 0, embedIdx++, contentOverride);
                 }
                 else if (embed.thumbnail && embed.thumbnail.url) {
                     // Start strict: only process thumbnail if it likely represents the content and we missed main video/image
-                    await this.processMediaUrl(message, embed.thumbnail.url, 'image/embed', `embed_thumb_${message.id}`, 0, embedIdx++);
+                    await this.processMediaUrl(message, embed.thumbnail.url, 'image/embed', `embed_thumb_${message.id}`, 0, embedIdx++, contentOverride);
                 }
             }
         }
@@ -200,14 +288,16 @@ export class DiscordService implements OnModuleInit {
                 if (snapshot.embeds && snapshot.embeds.length > 0) {
                     let embedIdx = 0;
                     for (const embed of snapshot.embeds) {
+                        const contentOverride = this.extractEmbedContent(embed);
+
                         if (embed.video && embed.video.url) {
-                            await this.processMediaUrl(message, embed.video.url, 'video/embed', `forward_video_${message.id}`, 0, embedIdx++, snapshot.content);
+                            await this.processMediaUrl(message, embed.video.url, 'video/embed', `forward_video_${message.id}`, 0, embedIdx++, snapshot.content || contentOverride);
                         }
                         else if (embed.image && embed.image.url) {
-                            await this.processMediaUrl(message, embed.image.url, 'image/embed', `forward_image_${message.id}`, 0, embedIdx++, snapshot.content);
+                            await this.processMediaUrl(message, embed.image.url, 'image/embed', `forward_image_${message.id}`, 0, embedIdx++, snapshot.content || contentOverride);
                         }
                         else if (embed.thumbnail && embed.thumbnail.url) {
-                            await this.processMediaUrl(message, embed.thumbnail.url, 'image/embed', `forward_thumb_${message.id}`, 0, embedIdx++, snapshot.content);
+                            await this.processMediaUrl(message, embed.thumbnail.url, 'image/embed', `forward_thumb_${message.id}`, 0, embedIdx++, snapshot.content || contentOverride);
                         }
                     }
                 }

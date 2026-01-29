@@ -158,6 +158,42 @@ export class MediaService {
     });
   }
 
+  async findAllWithDiscordId(limit: number = 300) {
+    // Find latest media items that have a message ID
+    // We want ONE media item per message ID to check metadata
+    // But actually, we probably want to update ALL media items for that message.
+    // So let's just get distinct message IDs and one media item for channel info.
+
+    const query = this.mediaRepository.createQueryBuilder('media')
+      .select('DISTINCT(media.discordMessageId)', 'discordMessageId')
+      .addSelect('media.originalChannel', 'originalChannel')
+      .addSelect('media.id', 'id') // Just need one ID to reference if needed, though we operate on MessageID
+      .addSelect('media.content', 'content')
+      .where('media.discordMessageId IS NOT NULL')
+      .orderBy('media.createdAt', 'DESC')
+      .limit(limit);
+
+    const RawResults = await query.getRawMany();
+    return RawResults.map(r => ({
+      id: r.id,
+      discordMessageId: r.discordMessageId,
+      originalChannel: r.originalChannel,
+      content: r.content
+    }));
+  }
+
+  async updateContent(id: string, content: string) {
+    // When we update content, better to update ALL media sharing that DiscordMessageID
+    // First, find the entity to get the MessageID
+    const media = await this.mediaRepository.findOneBy({ id });
+    if (!media) return;
+
+    await this.mediaRepository.update(
+      { discordMessageId: media.discordMessageId },
+      { content: content }
+    );
+  }
+
   async markUnavailable(id: string) {
     return this.mediaRepository.update(id, { isAvailable: false });
   }

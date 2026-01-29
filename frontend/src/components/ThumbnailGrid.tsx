@@ -968,15 +968,24 @@ export const ThumbnailGrid = () => {
                 )}
                 {viewMode === 'list' && (
                     <ControlGroup>
-                        <SliderLabel>
-                            Size:
-                            <RangeInput
-                                type="range" min="80" max="500" step="10"
-                                value={gridSize} onChange={(e) => setGridSize(Number(e.target.value))}
-                            />
-                        </SliderLabel>
+                        <ToggleButton onClick={async () => {
+                            if (!window.confirm('Sync Discord metadata for recent items? This will update titles and descriptions.')) return;
+                            try {
+                                await axios.post('/api/feed/sync-metadata');
+                                alert('Sync started! Check logs or refresh in a moment.');
+                            } catch (e) {
+                                alert('Sync failed');
+                            }
+                        }}>Sync Metadata</ToggleButton>
                     </ControlGroup>
                 )}
+                <SliderLabel>
+                    Size:
+                    <RangeInput
+                        type="range" min="80" max="500" step="10"
+                        value={gridSize} onChange={(e) => setGridSize(Number(e.target.value))}
+                    />
+                </SliderLabel>
             </Header>
 
             {viewMode === 'list' ? (
@@ -1049,85 +1058,88 @@ export const ThumbnailGrid = () => {
                     <div ref={feedRef} style={{ height: '100px', width: '100%' }}></div>
                     {feedLoading && <div style={{ color: '#8b949e', textAlign: 'center', padding: '20px' }}>Loading more...</div>}
                 </FeedContainer>
-            )}
+            )
+            }
 
-            {selectedGroup && (
-                <Overlay onClick={() => setSelectedGroup(null)}>
-                    <CloseButton onClick={(e) => { e.stopPropagation(); setSelectedGroup(null); }}>×</CloseButton>
-                    <ModalContainer onClick={e => e.stopPropagation()}>
-                        {selectedGroup.media.length > 1 && (
-                            <NavButton className="prev" onClick={handlePrev}>‹</NavButton>
-                        )}
-                        <ModalContentWrapper>
-                            <HorizontalScroll
-                                ref={modalScrollRef}
-                                onScroll={handleModalScroll}
-                                {...modalDragProps}
-                            >
-                                {selectedGroup.media.map((item, idx) => (
-                                    <HorizontalItem key={item.id}>
-                                        <MediaContent
-                                            onClick={e => e.stopPropagation()}
-                                            style={{
-                                                overflow: isZoomed && selectedIndex === idx ? 'auto' : 'hidden',
-                                                display: 'block'
-                                            }}
-                                        >
-                                            {item.type === 'video' ? (
-                                                <video
-                                                    key={item.id}
-                                                    src={getFullUrl(item.minioUrl)}
-                                                    controls autoPlay loop playsInline
-                                                    ref={el => { if (el && idx === selectedIndex) el.volume = 0.5; }}
-                                                    style={{ margin: 'auto', display: 'block', maxHeight: '80vh', maxWidth: '100%' }}
-                                                />
-                                            ) : (
-                                                <img
-                                                    src={getFullUrl(item.minioUrl)}
-                                                    alt="full"
-                                                    onClick={(e) => { e.stopPropagation(); setIsZoomed(!isZoomed); }}
-                                                    style={{
-                                                        cursor: isZoomed ? 'zoom-out' : 'zoom-in',
-                                                        maxHeight: isZoomed ? 'none' : '80vh',
-                                                        maxWidth: isZoomed ? 'none' : '100%',
-                                                        width: isZoomed ? 'auto' : '100%',
-                                                        display: 'block', margin: 'auto'
-                                                    }}
-                                                />
-                                            )}
-                                        </MediaContent>
-                                    </HorizontalItem>
-                                ))}
-                            </HorizontalScroll>
-                        </ModalContentWrapper>
-                        {selectedGroup.media.length > 1 && (
-                            <NavButton className="next" onClick={handleNext}>›</NavButton>
-                        )}
-                        <InfoPanel onClick={e => e.stopPropagation()}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                <div style={{ flex: 1, marginRight: '16px' }}>
-                                    <small style={{ color: '#8b949e', display: 'block', marginBottom: '8px' }}>
-                                        {new Date(selectedGroup.discordCreatedAt || selectedGroup.createdAt).toLocaleString()} • {selectedIndex + 1}/{selectedGroup.media.length}
-                                    </small>
-                                    <MessageText>{selectedGroup.content || '(No Text Content)'}</MessageText>
+            {
+                selectedGroup && (
+                    <Overlay onClick={() => setSelectedGroup(null)}>
+                        <CloseButton onClick={(e) => { e.stopPropagation(); setSelectedGroup(null); }}>×</CloseButton>
+                        <ModalContainer onClick={e => e.stopPropagation()}>
+                            {selectedGroup.media.length > 1 && (
+                                <NavButton className="prev" onClick={handlePrev}>‹</NavButton>
+                            )}
+                            <ModalContentWrapper>
+                                <HorizontalScroll
+                                    ref={modalScrollRef}
+                                    onScroll={handleModalScroll}
+                                    {...modalDragProps}
+                                >
+                                    {selectedGroup.media.map((item, idx) => (
+                                        <HorizontalItem key={item.id}>
+                                            <MediaContent
+                                                onClick={e => e.stopPropagation()}
+                                                style={{
+                                                    overflow: isZoomed && selectedIndex === idx ? 'auto' : 'hidden',
+                                                    display: 'block'
+                                                }}
+                                            >
+                                                {item.type === 'video' ? (
+                                                    <video
+                                                        key={item.id}
+                                                        src={getFullUrl(item.minioUrl)}
+                                                        controls autoPlay loop playsInline
+                                                        ref={el => { if (el && idx === selectedIndex) el.volume = 0.5; }}
+                                                        style={{ margin: 'auto', display: 'block', maxHeight: '80vh', maxWidth: '100%' }}
+                                                    />
+                                                ) : (
+                                                    <img
+                                                        src={getFullUrl(item.minioUrl)}
+                                                        alt="full"
+                                                        onClick={(e) => { e.stopPropagation(); setIsZoomed(!isZoomed); }}
+                                                        style={{
+                                                            cursor: isZoomed ? 'zoom-out' : 'zoom-in',
+                                                            maxHeight: isZoomed ? 'none' : '80vh',
+                                                            maxWidth: isZoomed ? 'none' : '100%',
+                                                            width: isZoomed ? 'auto' : '100%',
+                                                            display: 'block', margin: 'auto'
+                                                        }}
+                                                    />
+                                                )}
+                                            </MediaContent>
+                                        </HorizontalItem>
+                                    ))}
+                                </HorizontalScroll>
+                            </ModalContentWrapper>
+                            {selectedGroup.media.length > 1 && (
+                                <NavButton className="next" onClick={handleNext}>›</NavButton>
+                            )}
+                            <InfoPanel onClick={e => e.stopPropagation()}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                    <div style={{ flex: 1, marginRight: '16px' }}>
+                                        <small style={{ color: '#8b949e', display: 'block', marginBottom: '8px' }}>
+                                            {new Date(selectedGroup.discordCreatedAt || selectedGroup.createdAt).toLocaleString()} • {selectedIndex + 1}/{selectedGroup.media.length}
+                                        </small>
+                                        <MessageText>{selectedGroup.content || '(No Text Content)'}</MessageText>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '8px', flexDirection: 'column' }}>
+                                        <ButtonLink
+                                            href={`https://discord.com/channels/@me/${selectedGroup.originalChannel}/${selectedGroup.discordMessageId}`}
+                                            target="_blank" rel="noopener noreferrer"
+                                        >Discord</ButtonLink>
+                                        <button style={{ background: '#2ba44e', border: 'none', color: 'white', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
+                                            onClick={() => handleRedownload(selectedGroup.media[selectedIndex].id)}
+                                        >Re-download</button>
+                                        <button style={{ background: '#da3633', border: 'none', color: 'white', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
+                                            onClick={() => handleDelete(selectedGroup.media[selectedIndex].id, selectedGroup)}
+                                        >Delete</button>
+                                    </div>
                                 </div>
-                                <div style={{ display: 'flex', gap: '8px', flexDirection: 'column' }}>
-                                    <ButtonLink
-                                        href={`https://discord.com/channels/@me/${selectedGroup.originalChannel}/${selectedGroup.discordMessageId}`}
-                                        target="_blank" rel="noopener noreferrer"
-                                    >Discord</ButtonLink>
-                                    <button style={{ background: '#2ba44e', border: 'none', color: 'white', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
-                                        onClick={() => handleRedownload(selectedGroup.media[selectedIndex].id)}
-                                    >Re-download</button>
-                                    <button style={{ background: '#da3633', border: 'none', color: 'white', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
-                                        onClick={() => handleDelete(selectedGroup.media[selectedIndex].id, selectedGroup)}
-                                    >Delete</button>
-                                </div>
-                            </div>
-                        </InfoPanel>
-                    </ModalContainer>
-                </Overlay>
-            )}
+                            </InfoPanel>
+                        </ModalContainer>
+                    </Overlay>
+                )
+            }
         </>
     );
 };
