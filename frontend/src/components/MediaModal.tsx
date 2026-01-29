@@ -104,13 +104,17 @@ export const MediaModal = ({
             setPan({ x: 0, y: 0 });
             // Keep origin for smooth zoom out
         } else {
-            const rect = e.currentTarget.getBoundingClientRect();
+            // Get the actual image element's size (not the container)
+            const img = e.target as HTMLImageElement;
+            const rect = img.getBoundingClientRect();
 
             // Calculate dynamic zoom level based on image size vs screen size
-            // Goal: After zoom, image should fill approximately 90% of screen height
+            // Consider both height and width, use the smaller zoom to prevent overflow
             const targetHeight = window.innerHeight * 0.9;
-            const currentHeight = rect.height;
-            let calculatedZoom = targetHeight / currentHeight;
+            const targetWidth = window.innerWidth * 0.9;
+            const zoomByHeight = targetHeight / rect.height;
+            const zoomByWidth = targetWidth / rect.width;
+            let calculatedZoom = Math.min(zoomByHeight, zoomByWidth);
 
             // Clamp zoom between 1.2x and 2.5x
             calculatedZoom = Math.min(Math.max(calculatedZoom, 1.2), 2.5);
