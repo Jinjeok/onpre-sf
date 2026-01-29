@@ -620,12 +620,14 @@ const TwitterFeedCard = ({ group, getFullUrl, onZoom }: { group: GroupedMedia, g
     const [isDown, setIsDown] = useState(false);
     const [startX, setStartX] = useState(0);
     const [scrollLeft, setScrollLeft] = useState(0);
+    const dragDistance = useRef(0);
 
     const handleMouseDown = (e: React.MouseEvent) => {
         if (!scrollRef.current) return;
         setIsDown(true);
         setStartX(e.pageX - scrollRef.current.offsetLeft);
         setScrollLeft(scrollRef.current.scrollLeft);
+        dragDistance.current = 0;
     };
 
     const handleMouseLeave = () => setIsDown(false);
@@ -636,7 +638,17 @@ const TwitterFeedCard = ({ group, getFullUrl, onZoom }: { group: GroupedMedia, g
         e.preventDefault();
         const x = e.pageX - scrollRef.current.offsetLeft;
         const walk = (x - startX) * 2; // Scroll-fast
+
+        const diff = Math.abs(x - startX);
+        dragDistance.current += diff;
+
         scrollRef.current.scrollLeft = scrollLeft - walk;
+    };
+
+    const handleZoomClick = (url: string, type: 'image' | 'video') => {
+        // If dragged more than 5px, don't trigger zoom
+        if (dragDistance.current > 10) return;
+        onZoom(url, type);
     };
 
     return (
@@ -671,7 +683,7 @@ const TwitterFeedCard = ({ group, getFullUrl, onZoom }: { group: GroupedMedia, g
                                 alt="attachment"
                                 loading="lazy"
                                 style={{ maxWidth: '100%', maxHeight: '600px', display: 'block', cursor: 'zoom-in' }}
-                                onClick={() => onZoom(getFullUrl(item.minioUrl), 'image')}
+                                onClick={() => handleZoomClick(getFullUrl(item.minioUrl), 'image')}
                                 onDragStart={(e) => e.preventDefault()} // Prevent image drag
                             />
                         )}
