@@ -502,6 +502,101 @@ const FeedCard = ({ group, getFullUrl, onReportError }: { group: GroupedMedia, g
     );
 };
 
+// Twitter/Infinite Feed Style Components
+const TwitterCardContainer = styled.div`
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  padding: 12px;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+  width: 100%;
+`;
+
+const CardHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: #8b949e;
+`;
+
+const CardContent = styled.div`
+  margin-bottom: 12px;
+  white-space: pre-wrap;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #e6edf3;
+  word-break: break-word; /* Prevent overflow */
+`;
+
+const AttachmentScroll = styled.div`
+  display: flex;
+  overflow-x: auto;
+  gap: 8px;
+  scroll-behavior: smooth;
+  padding-bottom: 4px; /* Space for scrollbar */
+  
+  &::-webkit-scrollbar { height: 6px; }
+  &::-webkit-scrollbar-track { background: transparent; }
+  &::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
+  &::-webkit-scrollbar-thumb:hover { background: #58a6ff; }
+`;
+
+const AttachmentItem = styled.div<{ $isSingle?: boolean }>`
+  flex: 0 0 auto;
+  width: ${props => props.$isSingle ? '100%' : '85%'};
+  max-height: 600px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #30363d;
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #0d1117;
+`;
+
+const TwitterFeedCard = ({ group, getFullUrl, onZoom }: { group: GroupedMedia, getFullUrl: (url: string) => string, onZoom: (url: string, type: 'image' | 'video') => void }) => {
+    const isSingle = group.media.length === 1;
+
+    return (
+        <TwitterCardContainer>
+            <CardHeader>
+                <span>{new Date(group.discordCreatedAt || group.createdAt).toLocaleString()}</span>
+                {/* Could add Discord link here */}
+            </CardHeader>
+            {group.content && <CardContent>{group.content}</CardContent>}
+
+            <AttachmentScroll>
+                {group.media.map(item => (
+                    <AttachmentItem key={item.id} $isSingle={isSingle}>
+                        {item.type === 'video' ? (
+                            <video
+                                src={getFullUrl(item.minioUrl)}
+                                controls
+                                loop
+                                playsInline
+                                style={{ maxWidth: '100%', maxHeight: '600px', display: 'block' }}
+                            />
+                        ) : (
+                            <img
+                                src={getFullUrl(item.minioUrl)}
+                                alt="attachment"
+                                loading="lazy"
+                                style={{ maxWidth: '100%', maxHeight: '600px', display: 'block', cursor: 'zoom-in' }}
+                                onClick={() => onZoom(getFullUrl(item.minioUrl), 'image')}
+                            />
+                        )}
+                    </AttachmentItem>
+                ))}
+            </AttachmentScroll>
+        </TwitterCardContainer>
+    );
+};
+
 // Controls Bar
 const Header = styled.header`
   padding: 12px 16px;
@@ -603,7 +698,7 @@ export const ThumbnailGrid = () => {
     // Header States
     const [showVideos, setShowVideos] = useState(true);
     const [showImages, setShowImages] = useState(true);
-    const [viewMode, setViewMode] = useState<'list' | 'feed'>('list');
+    const [viewMode, setViewMode] = useState<'list' | 'swipe' | 'feed'>('list');
 
     // Feed Mode States
     const [feedItems, setFeedItems] = useState<GroupedMedia[]>([]);
@@ -937,6 +1032,7 @@ export const ThumbnailGrid = () => {
             <Header>
                 <ControlGroup>
                     <ToggleButton $active={viewMode === 'list'} onClick={() => setViewMode('list')}>List</ToggleButton>
+                    <ToggleButton $active={viewMode === 'swipe'} onClick={() => setViewMode('swipe')}>Swipe</ToggleButton>
                     <ToggleButton $active={viewMode === 'feed'} onClick={() => setViewMode('feed')}>Feed</ToggleButton>
 
                     <Separator />
@@ -968,19 +1064,6 @@ export const ThumbnailGrid = () => {
                         </ToggleButton>
                     </ControlGroup>
                 )}
-                {viewMode === 'list' && (
-                    <ControlGroup>
-                        <ToggleButton onClick={async () => {
-                            if (!window.confirm('Sync Discord metadata for recent items? This will update titles and descriptions.')) return;
-                            try {
-                                await api.post('/feed/sync-metadata');
-                                alert('Sync started! Check logs or refresh in a moment.');
-                            } catch (e) {
-                                alert('Sync failed');
-                            }
-                        }}>Sync Metadata</ToggleButton>
-                    </ControlGroup>
-                )}
                 <SliderLabel>
                     Size:
                     <RangeInput
@@ -1009,7 +1092,7 @@ export const ThumbnailGrid = () => {
                 />
             </Header>
 
-            {viewMode === 'list' ? (
+            {viewMode === 'list' && (
                 <GridContainer style={{ gridTemplateColumns: `repeat(auto-fill, minmax(${gridSize}px, 1fr))` }}>
                     {groups.map(group => {
                         const count = group.media.length;
@@ -1066,101 +1149,125 @@ export const ThumbnailGrid = () => {
                         </Loading>
                     )}
                 </GridContainer>
-            ) : (
-                <FeedContainer className="feed-container">
-                    {feedItems.map((group, idx) => (
-                        <FeedCard
-                            key={`${group.discordMessageId}-${idx}`}
-                            group={group}
-                            getFullUrl={getFullUrl}
-                            onReportError={handleReportError}
-                        />
-                    ))}
-                    <div ref={feedRef} style={{ height: '100px', width: '100%' }}></div>
-                    {feedLoading && <div style={{ color: '#8b949e', textAlign: 'center', padding: '20px' }}>Loading more...</div>}
-                </FeedContainer>
-            )
-            }
+            )}
+        </GridContainer >
+            )}
 
-            {
-                selectedGroup && (
-                    <Overlay onClick={() => setSelectedGroup(null)}>
-                        <CloseButton onClick={(e) => { e.stopPropagation(); setSelectedGroup(null); }}>×</CloseButton>
-                        <ModalContainer onClick={e => e.stopPropagation()}>
-                            {selectedGroup.media.length > 1 && (
-                                <NavButton className="prev" onClick={handlePrev}>‹</NavButton>
-                            )}
-                            <ModalContentWrapper>
-                                <HorizontalScroll
-                                    ref={modalScrollRef}
-                                    onScroll={handleModalScroll}
-                                    {...modalDragProps}
+{
+    viewMode === 'swipe' && (
+        <FeedContainer className="feed-container">
+            {feedItems.map((group, idx) => (
+                <FeedCard
+                    key={`${group.discordMessageId}-${idx}`}
+                    group={group}
+                    getFullUrl={getFullUrl}
+                    onReportError={handleReportError}
+                />
+            ))}
+            <div ref={feedRef} style={{ height: '100px', width: '100%' }}></div>
+            {feedLoading && <div style={{ color: '#8b949e', textAlign: 'center', padding: '20px' }}>Loading more...</div>}
+        </FeedContainer>
+    )
+}
+
+{
+    viewMode === 'feed' && (
+        <div style={{ display: 'flex', flexDirection: 'column', padding: '16px', maxWidth: '800px', margin: '0 auto' }}>
+            {feedItems.map((group, idx) => (
+                <TwitterFeedCard
+                    key={`${group.discordMessageId}-feed-${idx}`}
+                    group={group}
+                    getFullUrl={getFullUrl}
+                    onZoom={(url, type) => {
+                        setSelectedGroup(group);
+                    }}
+                />
+            ))}
+            <div ref={feedRef} style={{ height: '50px', width: '100%' }}></div>
+            {feedLoading && <div style={{ color: '#8b949e', textAlign: 'center', padding: '20px' }}>Loading more...</div>}
+        </div>
+    )
+}
+
+{
+    selectedGroup && (
+        <Overlay onClick={() => setSelectedGroup(null)}>
+            <CloseButton onClick={(e) => { e.stopPropagation(); setSelectedGroup(null); }}>×</CloseButton>
+            <ModalContainer onClick={e => e.stopPropagation()}>
+                {selectedGroup.media.length > 1 && (
+                    <NavButton className="prev" onClick={handlePrev}>‹</NavButton>
+                )}
+                <ModalContentWrapper>
+                    <HorizontalScroll
+                        ref={modalScrollRef}
+                        onScroll={handleModalScroll}
+                        {...modalDragProps}
+                    >
+                        {selectedGroup.media.map((item, idx) => (
+                            <HorizontalItem key={item.id}>
+                                <MediaContent
+                                    onClick={e => e.stopPropagation()}
+                                    style={{
+                                        overflow: isZoomed && selectedIndex === idx ? 'auto' : 'hidden',
+                                        display: 'block'
+                                    }}
                                 >
-                                    {selectedGroup.media.map((item, idx) => (
-                                        <HorizontalItem key={item.id}>
-                                            <MediaContent
-                                                onClick={e => e.stopPropagation()}
-                                                style={{
-                                                    overflow: isZoomed && selectedIndex === idx ? 'auto' : 'hidden',
-                                                    display: 'block'
-                                                }}
-                                            >
-                                                {item.type === 'video' ? (
-                                                    <video
-                                                        key={item.id}
-                                                        src={getFullUrl(item.minioUrl)}
-                                                        controls autoPlay loop playsInline
-                                                        ref={el => { if (el && idx === selectedIndex) el.volume = 0.5; }}
-                                                        style={{ margin: 'auto', display: 'block', maxHeight: '80vh', maxWidth: '100%' }}
-                                                    />
-                                                ) : (
-                                                    <img
-                                                        src={getFullUrl(item.minioUrl)}
-                                                        alt="full"
-                                                        onClick={(e) => { e.stopPropagation(); setIsZoomed(!isZoomed); }}
-                                                        style={{
-                                                            cursor: isZoomed ? 'zoom-out' : 'zoom-in',
-                                                            maxHeight: isZoomed ? 'none' : '80vh',
-                                                            maxWidth: isZoomed ? 'none' : '100%',
-                                                            width: isZoomed ? 'auto' : '100%',
-                                                            display: 'block', margin: 'auto'
-                                                        }}
-                                                    />
-                                                )}
-                                            </MediaContent>
-                                        </HorizontalItem>
-                                    ))}
-                                </HorizontalScroll>
-                            </ModalContentWrapper>
-                            {selectedGroup.media.length > 1 && (
-                                <NavButton className="next" onClick={handleNext}>›</NavButton>
-                            )}
-                            <InfoPanel onClick={e => e.stopPropagation()}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                    <div style={{ flex: 1, marginRight: '16px' }}>
-                                        <small style={{ color: '#8b949e', display: 'block', marginBottom: '8px' }}>
-                                            {new Date(selectedGroup.discordCreatedAt || selectedGroup.createdAt).toLocaleString()} • {selectedIndex + 1}/{selectedGroup.media.length}
-                                        </small>
-                                        <MessageText>{selectedGroup.content || '(No Text Content)'}</MessageText>
-                                    </div>
-                                    <div style={{ display: 'flex', gap: '8px', flexDirection: 'column' }}>
-                                        <ButtonLink
-                                            href={`https://discord.com/channels/@me/${selectedGroup.originalChannel}/${selectedGroup.discordMessageId}`}
-                                            target="_blank" rel="noopener noreferrer"
-                                        >Discord</ButtonLink>
-                                        <button style={{ background: '#2ba44e', border: 'none', color: 'white', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
-                                            onClick={() => handleRedownload(selectedGroup.media[selectedIndex].id)}
-                                        >Re-download</button>
-                                        <button style={{ background: '#da3633', border: 'none', color: 'white', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
-                                            onClick={() => handleDelete(selectedGroup.media[selectedIndex].id, selectedGroup)}
-                                        >Delete</button>
-                                    </div>
-                                </div>
-                            </InfoPanel>
-                        </ModalContainer>
-                    </Overlay>
-                )
-            }
+                                    {item.type === 'video' ? (
+                                        <video
+                                            key={item.id}
+                                            src={getFullUrl(item.minioUrl)}
+                                            controls autoPlay loop playsInline
+                                            ref={el => { if (el && idx === selectedIndex) el.volume = 0.5; }}
+                                            style={{ margin: 'auto', display: 'block', maxHeight: '80vh', maxWidth: '100%' }}
+                                        />
+                                    ) : (
+                                        <img
+                                            src={getFullUrl(item.minioUrl)}
+                                            alt="full"
+                                            onClick={(e) => { e.stopPropagation(); setIsZoomed(!isZoomed); }}
+                                            style={{
+                                                cursor: isZoomed ? 'zoom-out' : 'zoom-in',
+                                                maxHeight: isZoomed ? 'none' : '80vh',
+                                                maxWidth: isZoomed ? 'none' : '100%',
+                                                width: isZoomed ? 'auto' : '100%',
+                                                display: 'block', margin: 'auto'
+                                            }}
+                                        />
+                                    )}
+                                </MediaContent>
+                            </HorizontalItem>
+                        ))}
+                    </HorizontalScroll>
+                </ModalContentWrapper>
+                {selectedGroup.media.length > 1 && (
+                    <NavButton className="next" onClick={handleNext}>›</NavButton>
+                )}
+                <InfoPanel onClick={e => e.stopPropagation()}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div style={{ flex: 1, marginRight: '16px' }}>
+                            <small style={{ color: '#8b949e', display: 'block', marginBottom: '8px' }}>
+                                {new Date(selectedGroup.discordCreatedAt || selectedGroup.createdAt).toLocaleString()} • {selectedIndex + 1}/{selectedGroup.media.length}
+                            </small>
+                            <MessageText>{selectedGroup.content || '(No Text Content)'}</MessageText>
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px', flexDirection: 'column' }}>
+                            <ButtonLink
+                                href={`https://discord.com/channels/@me/${selectedGroup.originalChannel}/${selectedGroup.discordMessageId}`}
+                                target="_blank" rel="noopener noreferrer"
+                            >Discord</ButtonLink>
+                            <button style={{ background: '#2ba44e', border: 'none', color: 'white', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
+                                onClick={() => handleRedownload(selectedGroup.media[selectedIndex].id)}
+                            >Re-download</button>
+                            <button style={{ background: '#da3633', border: 'none', color: 'white', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
+                                onClick={() => handleDelete(selectedGroup.media[selectedIndex].id, selectedGroup)}
+                            >Delete</button>
+                        </div>
+                    </div>
+                </InfoPanel>
+            </ModalContainer>
+        </Overlay>
+    )
+}
         </>
     );
 };
