@@ -178,7 +178,7 @@ export class DiscordService implements OnModuleInit {
         if (message.embeds.length > 0) {
             let embedIdx = 0;
             for (const embed of message.embeds) {
-                this.logger.debug(`  - Inspecting Embed ${embedIdx}: Type=${embed.type}, Provider=${embed.provider?.name}, Video=${!!embed.video}, Image=${!!embed.image}, Thumbnail=${!!embed.thumbnail}`);
+                this.logger.debug(`  - Inspecting Embed ${embedIdx}: Type=${embed.data.type}, Provider=${embed.provider?.name}, Video=${!!embed.video}, Image=${!!embed.image}, Thumbnail=${!!embed.thumbnail}`);
 
                 if (embed.video && embed.video.url) {
                     await this.processMediaUrl(message, embed.video.url, 'video/embed', `embed_video_${message.id}`, 0, embedIdx++);
