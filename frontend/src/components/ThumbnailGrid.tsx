@@ -1150,124 +1150,122 @@ export const ThumbnailGrid = () => {
                     )}
                 </GridContainer>
             )}
-        </GridContainer >
-            )}
 
-{
-    viewMode === 'swipe' && (
-        <FeedContainer className="feed-container">
-            {feedItems.map((group, idx) => (
-                <FeedCard
-                    key={`${group.discordMessageId}-${idx}`}
-                    group={group}
-                    getFullUrl={getFullUrl}
-                    onReportError={handleReportError}
-                />
-            ))}
-            <div ref={feedRef} style={{ height: '100px', width: '100%' }}></div>
-            {feedLoading && <div style={{ color: '#8b949e', textAlign: 'center', padding: '20px' }}>Loading more...</div>}
-        </FeedContainer>
-    )
-}
-
-{
-    viewMode === 'feed' && (
-        <div style={{ display: 'flex', flexDirection: 'column', padding: '16px', maxWidth: '800px', margin: '0 auto' }}>
-            {feedItems.map((group, idx) => (
-                <TwitterFeedCard
-                    key={`${group.discordMessageId}-feed-${idx}`}
-                    group={group}
-                    getFullUrl={getFullUrl}
-                    onZoom={(url, type) => {
-                        setSelectedGroup(group);
-                    }}
-                />
-            ))}
-            <div ref={feedRef} style={{ height: '50px', width: '100%' }}></div>
-            {feedLoading && <div style={{ color: '#8b949e', textAlign: 'center', padding: '20px' }}>Loading more...</div>}
-        </div>
-    )
-}
-
-{
-    selectedGroup && (
-        <Overlay onClick={() => setSelectedGroup(null)}>
-            <CloseButton onClick={(e) => { e.stopPropagation(); setSelectedGroup(null); }}>×</CloseButton>
-            <ModalContainer onClick={e => e.stopPropagation()}>
-                {selectedGroup.media.length > 1 && (
-                    <NavButton className="prev" onClick={handlePrev}>‹</NavButton>
-                )}
-                <ModalContentWrapper>
-                    <HorizontalScroll
-                        ref={modalScrollRef}
-                        onScroll={handleModalScroll}
-                        {...modalDragProps}
-                    >
-                        {selectedGroup.media.map((item, idx) => (
-                            <HorizontalItem key={item.id}>
-                                <MediaContent
-                                    onClick={e => e.stopPropagation()}
-                                    style={{
-                                        overflow: isZoomed && selectedIndex === idx ? 'auto' : 'hidden',
-                                        display: 'block'
-                                    }}
-                                >
-                                    {item.type === 'video' ? (
-                                        <video
-                                            key={item.id}
-                                            src={getFullUrl(item.minioUrl)}
-                                            controls autoPlay loop playsInline
-                                            ref={el => { if (el && idx === selectedIndex) el.volume = 0.5; }}
-                                            style={{ margin: 'auto', display: 'block', maxHeight: '80vh', maxWidth: '100%' }}
-                                        />
-                                    ) : (
-                                        <img
-                                            src={getFullUrl(item.minioUrl)}
-                                            alt="full"
-                                            onClick={(e) => { e.stopPropagation(); setIsZoomed(!isZoomed); }}
-                                            style={{
-                                                cursor: isZoomed ? 'zoom-out' : 'zoom-in',
-                                                maxHeight: isZoomed ? 'none' : '80vh',
-                                                maxWidth: isZoomed ? 'none' : '100%',
-                                                width: isZoomed ? 'auto' : '100%',
-                                                display: 'block', margin: 'auto'
-                                            }}
-                                        />
-                                    )}
-                                </MediaContent>
-                            </HorizontalItem>
+            {
+                viewMode === 'swipe' && (
+                    <FeedContainer className="feed-container">
+                        {feedItems.map((group, idx) => (
+                            <FeedCard
+                                key={`${group.discordMessageId}-${idx}`}
+                                group={group}
+                                getFullUrl={getFullUrl}
+                                onReportError={handleReportError}
+                            />
                         ))}
-                    </HorizontalScroll>
-                </ModalContentWrapper>
-                {selectedGroup.media.length > 1 && (
-                    <NavButton className="next" onClick={handleNext}>›</NavButton>
-                )}
-                <InfoPanel onClick={e => e.stopPropagation()}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <div style={{ flex: 1, marginRight: '16px' }}>
-                            <small style={{ color: '#8b949e', display: 'block', marginBottom: '8px' }}>
-                                {new Date(selectedGroup.discordCreatedAt || selectedGroup.createdAt).toLocaleString()} • {selectedIndex + 1}/{selectedGroup.media.length}
-                            </small>
-                            <MessageText>{selectedGroup.content || '(No Text Content)'}</MessageText>
-                        </div>
-                        <div style={{ display: 'flex', gap: '8px', flexDirection: 'column' }}>
-                            <ButtonLink
-                                href={`https://discord.com/channels/@me/${selectedGroup.originalChannel}/${selectedGroup.discordMessageId}`}
-                                target="_blank" rel="noopener noreferrer"
-                            >Discord</ButtonLink>
-                            <button style={{ background: '#2ba44e', border: 'none', color: 'white', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
-                                onClick={() => handleRedownload(selectedGroup.media[selectedIndex].id)}
-                            >Re-download</button>
-                            <button style={{ background: '#da3633', border: 'none', color: 'white', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
-                                onClick={() => handleDelete(selectedGroup.media[selectedIndex].id, selectedGroup)}
-                            >Delete</button>
-                        </div>
+                        <div ref={feedRef} style={{ height: '100px', width: '100%' }}></div>
+                        {feedLoading && <div style={{ color: '#8b949e', textAlign: 'center', padding: '20px' }}>Loading more...</div>}
+                    </FeedContainer>
+                )
+            }
+
+            {
+                viewMode === 'feed' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', padding: '16px', maxWidth: '800px', margin: '0 auto' }}>
+                        {feedItems.map((group, idx) => (
+                            <TwitterFeedCard
+                                key={`${group.discordMessageId}-feed-${idx}`}
+                                group={group}
+                                getFullUrl={getFullUrl}
+                                onZoom={(url, type) => {
+                                    setSelectedGroup(group);
+                                }}
+                            />
+                        ))}
+                        <div ref={feedRef} style={{ height: '50px', width: '100%' }}></div>
+                        {feedLoading && <div style={{ color: '#8b949e', textAlign: 'center', padding: '20px' }}>Loading more...</div>}
                     </div>
-                </InfoPanel>
-            </ModalContainer>
-        </Overlay>
-    )
-}
+                )
+            }
+
+            {
+                selectedGroup && (
+                    <Overlay onClick={() => setSelectedGroup(null)}>
+                        <CloseButton onClick={(e) => { e.stopPropagation(); setSelectedGroup(null); }}>×</CloseButton>
+                        <ModalContainer onClick={e => e.stopPropagation()}>
+                            {selectedGroup.media.length > 1 && (
+                                <NavButton className="prev" onClick={handlePrev}>‹</NavButton>
+                            )}
+                            <ModalContentWrapper>
+                                <HorizontalScroll
+                                    ref={modalScrollRef}
+                                    onScroll={handleModalScroll}
+                                    {...modalDragProps}
+                                >
+                                    {selectedGroup.media.map((item, idx) => (
+                                        <HorizontalItem key={item.id}>
+                                            <MediaContent
+                                                onClick={e => e.stopPropagation()}
+                                                style={{
+                                                    overflow: isZoomed && selectedIndex === idx ? 'auto' : 'hidden',
+                                                    display: 'block'
+                                                }}
+                                            >
+                                                {item.type === 'video' ? (
+                                                    <video
+                                                        key={item.id}
+                                                        src={getFullUrl(item.minioUrl)}
+                                                        controls autoPlay loop playsInline
+                                                        ref={el => { if (el && idx === selectedIndex) el.volume = 0.5; }}
+                                                        style={{ margin: 'auto', display: 'block', maxHeight: '80vh', maxWidth: '100%' }}
+                                                    />
+                                                ) : (
+                                                    <img
+                                                        src={getFullUrl(item.minioUrl)}
+                                                        alt="full"
+                                                        onClick={(e) => { e.stopPropagation(); setIsZoomed(!isZoomed); }}
+                                                        style={{
+                                                            cursor: isZoomed ? 'zoom-out' : 'zoom-in',
+                                                            maxHeight: isZoomed ? 'none' : '80vh',
+                                                            maxWidth: isZoomed ? 'none' : '100%',
+                                                            width: isZoomed ? 'auto' : '100%',
+                                                            display: 'block', margin: 'auto'
+                                                        }}
+                                                    />
+                                                )}
+                                            </MediaContent>
+                                        </HorizontalItem>
+                                    ))}
+                                </HorizontalScroll>
+                            </ModalContentWrapper>
+                            {selectedGroup.media.length > 1 && (
+                                <NavButton className="next" onClick={handleNext}>›</NavButton>
+                            )}
+                            <InfoPanel onClick={e => e.stopPropagation()}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                    <div style={{ flex: 1, marginRight: '16px' }}>
+                                        <small style={{ color: '#8b949e', display: 'block', marginBottom: '8px' }}>
+                                            {new Date(selectedGroup.discordCreatedAt || selectedGroup.createdAt).toLocaleString()} • {selectedIndex + 1}/{selectedGroup.media.length}
+                                        </small>
+                                        <MessageText>{selectedGroup.content || '(No Text Content)'}</MessageText>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '8px', flexDirection: 'column' }}>
+                                        <ButtonLink
+                                            href={`https://discord.com/channels/@me/${selectedGroup.originalChannel}/${selectedGroup.discordMessageId}`}
+                                            target="_blank" rel="noopener noreferrer"
+                                        >Discord</ButtonLink>
+                                        <button style={{ background: '#2ba44e', border: 'none', color: 'white', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
+                                            onClick={() => handleRedownload(selectedGroup.media[selectedIndex].id)}
+                                        >Re-download</button>
+                                        <button style={{ background: '#da3633', border: 'none', color: 'white', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold' }}
+                                            onClick={() => handleDelete(selectedGroup.media[selectedIndex].id, selectedGroup)}
+                                        >Delete</button>
+                                    </div>
+                                </div>
+                            </InfoPanel>
+                        </ModalContainer>
+                    </Overlay>
+                )
+            }
         </>
     );
 };
