@@ -606,8 +606,19 @@ const TwitterFeedCard = ({ group, getFullUrl, onZoom }: { group: GroupedMedia, g
         const videos = cardNode.querySelectorAll('video');
         videos.forEach(video => {
             if (inView) {
-                // Try playing. Muted is usually required for auto-play
-                video.play().catch(() => { });
+                // Set volume to 50%
+                video.volume = 0.5;
+                // Browsers often block auto-play with audio. 
+                // We attempt to play unmuted, but might need to mute if it fails.
+                const playPromise = video.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch(error => {
+                        // Auto-play was prevented. 
+                        // We could retry muted, but user specifically asked for 50%.
+                        // If it fails, it fails, but typically user interaction (the click to Feed) permits it.
+                        console.warn("Auto-play with audio blocked:", error);
+                    });
+                }
             } else {
                 video.pause();
             }
@@ -674,15 +685,21 @@ const TwitterFeedCard = ({ group, getFullUrl, onZoom }: { group: GroupedMedia, g
                                 controls
                                 loop
                                 playsInline
-                                muted // Required for auto-play
-                                style={{ maxWidth: '100%', maxHeight: '600px', display: 'block' }}
+                                style={{ maxWidth: '100%', maxHeight: '600px', display: 'block', pointerEvents: 'auto' }}
                             />
                         ) : (
                             <img
                                 src={getFullUrl(item.minioUrl)}
                                 alt="attachment"
                                 loading="lazy"
-                                style={{ maxWidth: '100%', maxHeight: '600px', display: 'block', cursor: 'zoom-in' }}
+                                style={{
+                                    maxWidth: '100%',
+                                    maxHeight: '600px',
+                                    display: 'block',
+                                    cursor: 'zoom-in',
+                                    userSelect: 'none',
+                                    WebkitUserDrag: 'none'
+                                }}
                                 onClick={() => handleZoomClick(getFullUrl(item.minioUrl), 'image')}
                                 onDragStart={(e) => e.preventDefault()} // Prevent image drag
                             />
