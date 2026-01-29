@@ -46,6 +46,7 @@ export const MediaModal = ({
     const [isDragging, setIsDragging] = useState(false);
     const dragStartRef = useRef<{ x: number, y: number } | null>(null);
     const panStartRef = useRef<{ x: number, y: number }>({ x: 0, y: 0 });
+    const dragDistance = useRef(0);
 
     // Reset Zoom/Pan on slide change
     useEffect(() => {
@@ -90,6 +91,9 @@ export const MediaModal = ({
 
     const handleZoomToggle = (e: React.MouseEvent) => {
         e.stopPropagation();
+        // Prevent zoom toggle if dragged
+        if (dragDistance.current > 10) return;
+
         if (zoomLevel > 1) {
             setZoomLevel(1);
             setPan({ x: 0, y: 0 });
@@ -104,6 +108,7 @@ export const MediaModal = ({
         setIsDragging(true);
         dragStartRef.current = { x: e.clientX, y: e.clientY };
         panStartRef.current = { ...pan };
+        dragDistance.current = 0;
     };
 
     const handleMouseMove = (e: React.MouseEvent) => {
@@ -111,6 +116,8 @@ export const MediaModal = ({
         e.preventDefault();
         const dx = e.clientX - dragStartRef.current.x;
         const dy = e.clientY - dragStartRef.current.y;
+        dragDistance.current = Math.sqrt(dx * dx + dy * dy);
+
         setPan({
             x: panStartRef.current.x + dx,
             y: panStartRef.current.y + dy
@@ -191,8 +198,8 @@ export const MediaModal = ({
                                             alt="full"
                                             onClick={handleZoomToggle}
                                             style={{
-                                                maxHeight: '80vh',
-                                                maxWidth: '100%',
+                                                maxHeight: zoomLevel > 1 ? 'none' : '80vh',
+                                                maxWidth: zoomLevel > 1 ? 'none' : '100%',
                                                 display: 'block',
                                                 transform: `scale(${idx === selectedIndex ? zoomLevel : 1}) translate(${idx === selectedIndex ? pan.x / zoomLevel : 0}px, ${idx === selectedIndex ? pan.y / zoomLevel : 0}px)`,
                                                 transformOrigin: 'center center',
@@ -209,7 +216,7 @@ export const MediaModal = ({
                 {group.media.length > 1 && (
                     <NavButton className="next" onClick={(e) => { e.stopPropagation(); handleNext(); }}>›</NavButton>
                 )}
-                <InfoPanel onClick={e => e.stopPropagation()}>
+                <InfoPanel onClick={e => e.stopPropagation()} className={zoomLevel > 1 ? 'hidden' : ''}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                         <div style={{ flex: 1, marginRight: '16px' }}>
                             <small style={{ color: '#8b949e', display: 'block', marginBottom: '8px' }}>

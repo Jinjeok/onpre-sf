@@ -47,7 +47,9 @@ export const FeedCard = ({ group, getFullUrl, onReportError, globalVolume }: Fee
 
         const videos = cardNode.querySelectorAll('video');
         videos.forEach(video => {
-            video.pause();
+            if (video !== videoRef.current) {
+                video.pause();
+            }
         });
 
         if (inView && videoRef.current) {

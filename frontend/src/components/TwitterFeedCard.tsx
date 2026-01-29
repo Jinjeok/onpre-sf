@@ -21,6 +21,7 @@ interface TwitterFeedCardProps {
  */
 export const TwitterFeedCard = ({ group, getFullUrl, onZoom, globalVolume }: TwitterFeedCardProps) => {
     const isSingle = group.media.length === 1;
+    const [currentIndex, setCurrentIndex] = useState(0);
 
     // Auto-play on focus
     const { ref: cardRef, inView } = useInView({
@@ -43,20 +44,23 @@ export const TwitterFeedCard = ({ group, getFullUrl, onZoom, globalVolume }: Twi
             // Always update volume
             video.volume = globalVolume;
 
-            if (inView) {
-                // Browsers often block auto-play with audio. 
-                // We attempt to play unmuted, but might need to mute if it fails.
+            // Check if this video matches the current index
+            const videoIndex = Number(video.dataset.index);
+            const shouldPlay = inView && videoIndex === currentIndex;
+
+            if (shouldPlay) {
                 const playPromise = video.play();
                 if (playPromise !== undefined) {
-                    playPromise.catch(error => {
-                        console.warn("Auto-play with audio blocked:", error);
+                    playPromise.catch(() => {
+                        // console.warn("Auto-play blocked:");
                     });
                 }
             } else {
                 video.pause();
+                video.currentTime = 0; // Optional: reset time when scrolled away? Maybe just pause.
             }
         });
-    }, [inView, cardNode, globalVolume]);
+    }, [inView, cardNode, globalVolume, currentIndex]);
 
 
     // Drag Scroll Logic
@@ -89,6 +93,17 @@ export const TwitterFeedCard = ({ group, getFullUrl, onZoom, globalVolume }: Twi
         scrollRef.current.scrollLeft = scrollLeft - walk;
     };
 
+    // Sync index on scroll
+    const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+        const target = e.currentTarget;
+        const itemWidth = target.firstElementChild?.clientWidth || target.clientWidth;
+        // gap is 8px
+        const newIndex = Math.round(target.scrollLeft / (itemWidth + 8));
+        if (newIndex !== currentIndex) {
+            setCurrentIndex(newIndex);
+        }
+    };
+
     const handleZoomClick = (url: string, type: 'image' | 'video') => {
         // If dragged more than 5px, don't trigger zoom
         if (dragDistance.current > 10) return;
@@ -109,12 +124,14 @@ export const TwitterFeedCard = ({ group, getFullUrl, onZoom, globalVolume }: Twi
                 onMouseLeave={handleMouseLeave}
                 onMouseUp={handleMouseUp}
                 onMouseMove={handleMouseMove}
+                onScroll={handleScroll}
             >
-                {group.media.map(item => (
+                {group.media.map((item, idx) => (
                     <AttachmentItem key={item.id} $isSingle={isSingle}>
                         {item.type === 'video' ? (
                             <video
                                 src={getFullUrl(item.minioUrl)}
+                                data-index={idx}
                                 controls
                                 loop
                                 playsInline

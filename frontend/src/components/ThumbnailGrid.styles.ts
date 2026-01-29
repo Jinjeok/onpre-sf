@@ -216,6 +216,11 @@ export const InfoPanel = styled.div`
   display: flex;
   flex-direction: column;
   justify-content: center;
+  transition: transform 0.3s ease-in-out;
+
+  &.hidden {
+    transform: translateY(100%);
+  }
 `;
 
 export const MessageText = styled.div`
