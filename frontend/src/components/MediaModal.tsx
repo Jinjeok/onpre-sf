@@ -172,7 +172,7 @@ export const MediaModal = ({
                 {group.media.length > 1 && (
                     <NavButton className="prev" onClick={(e) => { e.stopPropagation(); handlePrev(); }}>‹</NavButton>
                 )}
-                <ModalContentWrapper>
+                <ModalContentWrapper className={zoomLevel > 1 ? 'zoomed' : ''}>
                     <HorizontalScroll
                         ref={modalScrollRef}
                         onScroll={handleModalScroll}

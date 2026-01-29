@@ -186,6 +186,12 @@ export const ModalContentWrapper = styled.div`
   width: 100%;
   height: 100%;
   position: relative;
+  padding-bottom: 15vh; /* Reserve space for InfoPanel */
+  transition: padding-bottom 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+
+  &.zoomed {
+    padding-bottom: 0;
+  }
 `;
 
 export const MediaContent = styled.div`
@@ -205,26 +211,26 @@ export const MediaContent = styled.div`
 `;
 
 export const InfoPanel = styled.div`
-  background: #161b22;
   padding: 16px;
   border-top: 1px solid #30363d;
   width: 100%;
   color: #c9d1d9;
   z-index: 1002;
-  /* Make panel sit at bottom properly */
   min-height: 15vh;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  transition: transform 0.3s ease-in-out;
   position: absolute;
   bottom: 0;
   left: 0;
-  background: rgba(22, 27, 34, 0.95); /* Slightly transparent background */
-  backdrop-filter: blur(5px);
+  background: rgba(22, 27, 34, 0.95);
+  backdrop-filter: blur(8px);
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 
   &.hidden {
     transform: translateY(100%);
+    opacity: 0;
   }
 `;
 
