@@ -165,12 +165,13 @@ export class MediaService {
     // So let's just get distinct message IDs and one media item for channel info.
 
     const query = this.mediaRepository.createQueryBuilder('media')
-      .select('DISTINCT(media.discordMessageId)', 'discordMessageId')
+      .select('media.discordMessageId', 'discordMessageId')
       .addSelect('media.originalChannel', 'originalChannel')
-      .addSelect('media.id', 'id') // Just need one ID to reference if needed, though we operate on MessageID
+      .addSelect('media.id', 'id')
       .addSelect('media.content', 'content')
+      .distinctOn(['media.discordMessageId'])
       .where('media.discordMessageId IS NOT NULL')
-      .orderBy('media.createdAt', 'DESC')
+      .orderBy('media.discordMessageId', 'DESC')
       .limit(limit);
 
     const RawResults = await query.getRawMany();
