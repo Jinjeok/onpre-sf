@@ -55,7 +55,7 @@ export class MediaService {
     });
   }
 
-  async findAllGrouped(limit: number = 20, offset: number = 0, type?: string, sortBy: 'fetch' | 'discord' = 'fetch', sortOrder: 'ASC' | 'DESC' = 'DESC') {
+  async findAllGrouped(limit: number = 20, offset: number = 0, type?: string, sortBy: 'fetch' | 'discord' = 'fetch', sortOrder: 'ASC' | 'DESC' = 'DESC', search?: string) {
     // 1. Get distinct message IDs with pagination
     const query = this.mediaRepository.createQueryBuilder('media')
       .select('media.discordMessageId')
@@ -73,6 +73,13 @@ export class MediaService {
 
     if (type) {
       query.where('media.type = :type', { type });
+    }
+
+    if (search) {
+      // Use brackets to ensure OR logic doesn't mess up other conditions if we had more
+      // But here we might want to search in content OR originalChannel? user said 'context' which is content.
+      // Also, we used WHERE on type, so we need AND WHERE
+      query.andWhere('media.content ILIKE :search', { search: `%${search}%` });
     }
 
     const messageIdsResult = await query.getRawMany();

@@ -216,20 +216,22 @@ export class DiscordService implements OnModuleInit {
                 if (!message) continue;
 
                 // Re-extract content
-                let newContent: string | undefined;
+                const parts: string[] = [];
+                if (message.content) parts.push(message.content);
 
-                // Priority: Embeds -> Content (if direct message has text)
                 if (message.embeds.length > 0) {
                     // Find the embed that likely matched this media? 
                     // It's hard to know WHICH embed matched this specific file if there are multiple.
                     // But usually tweets have 1 main embed.
                     // Let's just take the first rich embed?
                     const embed = message.embeds[0];
-                    newContent = this.extractEmbedContent(embed);
+                    const embedContent = this.extractEmbedContent(embed);
+                    if (embedContent) parts.push(embedContent);
                 }
 
-                if (!newContent && message.content) {
-                    newContent = message.content;
+                let newContent: string | undefined;
+                if (parts.length > 0) {
+                    newContent = parts.join('\n\n');
                 }
 
                 if (newContent && newContent !== media.content) {
@@ -261,17 +263,23 @@ export class DiscordService implements OnModuleInit {
         if (message.embeds.length > 0) {
             let embedIdx = 0;
             for (const embed of message.embeds) {
-                const contentOverride = this.extractEmbedContent(embed);
+                const embedContent = this.extractEmbedContent(embed);
+
+                // Combine original content (URL) + Embed Content
+                const parts: string[] = [];
+                if (message.content) parts.push(message.content);
+                if (embedContent) parts.push(embedContent);
+                const finalContent = parts.length > 0 ? parts.join('\n\n') : undefined;
 
                 if (embed.video && embed.video.url) {
-                    await this.processMediaUrl(message, embed.video.url, 'video/embed', `embed_video_${message.id}`, 0, embedIdx++, contentOverride);
+                    await this.processMediaUrl(message, embed.video.url, 'video/embed', `embed_video_${message.id}`, 0, embedIdx++, finalContent);
                 }
                 else if (embed.image && embed.image.url) {
-                    await this.processMediaUrl(message, embed.image.url, 'image/embed', `embed_image_${message.id}`, 0, embedIdx++, contentOverride);
+                    await this.processMediaUrl(message, embed.image.url, 'image/embed', `embed_image_${message.id}`, 0, embedIdx++, finalContent);
                 }
                 else if (embed.thumbnail && embed.thumbnail.url) {
                     // Start strict: only process thumbnail if it likely represents the content and we missed main video/image
-                    await this.processMediaUrl(message, embed.thumbnail.url, 'image/embed', `embed_thumb_${message.id}`, 0, embedIdx++, contentOverride);
+                    await this.processMediaUrl(message, embed.thumbnail.url, 'image/embed', `embed_thumb_${message.id}`, 0, embedIdx++, finalContent);
                 }
             }
         }

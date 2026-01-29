@@ -598,6 +598,7 @@ export const ThumbnailGrid = () => {
     const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
     const [errorInfo, setErrorInfo] = useState<string | null>(null);
     const [isZoomed, setIsZoomed] = useState(false); // Zoom state for detail view
+    const [searchQuery, setSearchQuery] = useState('');
 
     // Header States
     const [showVideos, setShowVideos] = useState(true);
@@ -731,7 +732,8 @@ export const ThumbnailGrid = () => {
                     offset: currentOffset,
                     type: typeParam,
                     sort: sortBy,
-                    order: sortOrder
+                    order: sortOrder,
+                    search: searchQuery || undefined
                 }
             });
             const newGroups = response.data;
@@ -986,6 +988,25 @@ export const ThumbnailGrid = () => {
                         value={gridSize} onChange={(e) => setGridSize(Number(e.target.value))}
                     />
                 </SliderLabel>
+                <input
+                    type="text"
+                    placeholder="Search..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                            setGroups([]); setHasMore(true);
+                        }
+                    }}
+                    style={{
+                        marginLeft: '16px',
+                        padding: '4px 8px',
+                        borderRadius: '4px',
+                        border: '1px solid #30363d',
+                        backgroundColor: '#0d1117',
+                        color: 'white'
+                    }}
+                />
             </Header>
 
             {viewMode === 'list' ? (
