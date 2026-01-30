@@ -1,0 +1,86 @@
+# Production Docker Compose
+# Usage: docker-compose -f docker-compose.prod.yml up --build -d
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: onpre-sf-postgres
+    environment:
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_DATABASE}
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    networks:
+      - onpre-sf-network
+    restart: always
+
+  minio:
+    image: minio/minio
+    container_name: onpre-sf-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    ports:
+      - "${PORT_MINIO:-9000}:9000"
+      - "${PORT_MINIO_CONSOLE:-9001}:9001"
+    volumes:
+      - ./data/minio:/data
+    networks:
+      - onpre-sf-network
+    restart: always
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    container_name: onpre-sf-backend
+    ports:
+      - "${PORT_BACKEND:-3000}:3000"
+    environment:
+      - NODE_ENV=production
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USERNAME=${DB_USERNAME}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_DATABASE=${DB_DATABASE}
+      - MINIO_ENDPOINT=minio
+      - MINIO_PORT=9000
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
+      - MINIO_BUCKET_NAME=${MINIO_BUCKET_NAME}
+      - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
+      - DISCORD_CHANNEL_IDS=${DISCORD_CHANNEL_IDS}
+      - JWT_SECRET=${JWT_SECRET}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - GOOGLE_CALLBACK_URL=${GOOGLE_CALLBACK_URL}
+      - GOOGLE_ALLOWED_EMAILS=${GOOGLE_ALLOWED_EMAILS}
+      - FRONTEND_URL=${FRONTEND_URL}
+      - PORT_FRONTEND=${PORT_FRONTEND}
+    depends_on:
+      - postgres
+      - minio
+    networks:
+      - onpre-sf-network
+    restart: always
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      args:
+        VITE_API_URL: ${VITE_API_URL}
+    container_name: onpre-sf-frontend
+    ports:
+      - "${PORT_FRONTEND:-9053}:80"
+    depends_on:
+      - backend
+    networks:
+      - onpre-sf-network
+    restart: always
+
+networks:
+  onpre-sf-network:
+    driver: bridge

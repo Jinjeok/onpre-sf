@@ -1,0 +1,30 @@
+# Build stage
+FROM node:20-alpine AS builder
+
+# Required for bcrypt native module compilation
+RUN apk add --no-cache python3 make g++
+
+WORKDIR /usr/src/app
+
+COPY package*.json ./
+RUN npm ci
+
+COPY . .
+RUN npm run build
+
+# Production stage
+FROM node:20-alpine
+
+# ffmpeg for video processing
+RUN apk add --no-cache ffmpeg
+
+WORKDIR /usr/src/app
+
+# Copy built files and production dependencies
+COPY --from=builder /usr/src/app/dist ./dist
+COPY --from=builder /usr/src/app/node_modules ./node_modules
+COPY package*.json ./
+
+EXPOSE 3000
+
+CMD ["node", "dist/main"]
